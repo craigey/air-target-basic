@@ -1,0 +1,24 @@
+<h1>🎯 Simple Target Scoring</h1>
+
+<img src="/video/0">
+
+<div>
+<button onclick="fetch('/toggle')">Start / Stop Detection</button>
+<button onclick="fetch('/reset')">Reset</button>
+<a href="/calibrate">Calibration</a>
+</div>
+
+<h3>Hits</h3>
+<table id="hits"></table>
+
+<script>
+setInterval(()=>{
+ fetch("/hits").then(r=>r.json()).then(data=>{
+   let html="<tr><th>#</th><th>Score</th><th>Confidence</th></tr>";
+   data.forEach((h,i)=>{
+     html+=`<tr><td>${i+1}</td><td>${h.score}</td><td>${h.confidence}</td></tr>`;
+   });
+   document.getElementById("hits").innerHTML=html;
+ });
+},500);
+</script>

@@ -1,0 +1,19 @@
+<h2>Zoom & Crop Calibration</h2>
+<p>Click center → Click bull edge</p>
+
+<img id="feed" src="/video/0">
+
+<script>
+let pts = [];
+document.getElementById("feed").onclick = e => {
+  pts.push({x:e.offsetX, y:e.offsetY});
+  if(pts.length==2){
+    fetch("/set_calibration",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(pts)
+    });
+    alert("Calibration Saved");
+  }
+}
+</script>
