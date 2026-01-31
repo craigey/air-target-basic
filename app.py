@@ -3,6 +3,7 @@ from camera_manager import init_cameras, get_frame
 from calibration import set_calibration
 from detection import toggle_detection, get_hits, reset_hits
 import json
+import cv2
 
 cfg = json.load(open("config.json"))
 

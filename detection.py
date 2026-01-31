@@ -4,6 +4,7 @@ from heatmap import register_hit
 from ai_classifier import classify_hit
 from target_detection import detect_target
 from calibration import set_auto_target
+from overlay import draw_overlay
 
 cfg = json.load(open("config.json"))
 
@@ -76,7 +77,10 @@ def process_frame(frame, cam_id):
 
             register_hit(x,y)
 
-            cv2.circle(frame, (int(x),int(y)), 6, (0,0,255), 2)
+             hit_detected = True
+        cv2.circle(frame, (int(x),int(y)), 6, (0,0,255), 2)
 
+if hit_detected:
     baseline[cam_id] = gray.copy()
-    return draw_overlay(frame)
+
+return draw_overlay(frame)
