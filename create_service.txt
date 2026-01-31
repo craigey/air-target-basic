@@ -1,0 +1,43 @@
+sudo nano /etc/systemd/system/target-scoring.service
+
+[Unit]
+Description=Airgun Target Scoring System
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/target-scoring
+ExecStartPre=/bin/sleep 5
+ExecStart=/home/pi/target-scoring/start.sh
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+# Camera access
+SupplementaryGroups=video
+DeviceAllow=/dev/video*
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
+
+
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl enable target-scoring
+sudo systemctl start target-scoring
+
+systemctl status target-scoring
+
+journalctl -u target-scoring -f
+
+
+
+sudo usermod -aG video pi
+
+
