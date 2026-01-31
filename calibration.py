@@ -1,29 +1,35 @@
 import math
 
-# Global target state
 _target = {
     "center": None,
-    "rings_px": []
+    "rings_px": [],
+    "scale_mm": None
 }
 
-def set_auto_target(geom):
-    """
-    geom = {
-        "center": (x,y),
-        "rings_px": [r_bull, r1, r2, r3, r4]
-    }
-    """
-    global _target
-    _target["center"] = geom["center"]
-    _target["rings_px"] = geom["rings_px"]
+# REAL dimensions (mm)
+BULL_DIAM = 9.525
+RINGS_MM = [25.4, 50.8, 76.2, 101.6]
 
 def set_calibration(data):
-    """
-    Manual calibration from UI
-    """
-    global _target
-    _target["center"] = tuple(data["center"])
-    _target["rings_px"] = data["rings_px"]
+    cx, cy = int(data["center"]["x"]), int(data["center"]["y"])
+
+    bull_r = math.dist(
+        (cx,cy),
+        (data["bull"]["x"], data["bull"]["y"])
+    )
+
+    outer_r = math.dist(
+        (cx,cy),
+        (data["outer"]["x"], data["outer"]["y"])
+    )
+
+    mm_per_px = (RINGS_MM[-1]/2) / outer_r
+
+    _target["center"] = (cx,cy)
+    _target["scale_mm"] = mm_per_px
+    _target["rings_px"] = [
+        (mm/2)/mm_per_px for mm in RINGS_MM
+    ]
 
 def get_target():
     return _target

@@ -4,6 +4,14 @@ from calibration import set_calibration
 from detection import toggle_detection, get_hits, reset_hits
 import json
 import cv2
+import threading
+from breakbeam import watch_breakbeam
+from overlay import toggle_heatmap
+
+threading.Thread(
+    target=watch_breakbeam,
+    daemon=True
+).start()
 
 cfg = json.load(open("config.json"))
 
@@ -33,11 +41,19 @@ def toggle():
 @app.route("/hits")
 def hits():
     return jsonify(get_hits())
+    
+@app.route("/spectator")
+def spectator():
+    return render_template("spectator.html")
 
 @app.route("/reset")
 def reset():
     reset_hits()
     return "OK"
+
+@app.route("/toggle_heatmap")
+def toggle_heat():
+    return {"active": toggle_heatmap()}
 
 @app.route("/set_calibration", methods=["POST"])
 def set_cal():

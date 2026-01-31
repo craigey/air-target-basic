@@ -8,11 +8,16 @@ def draw_overlay(frame):
 
     cx, cy = t["center"]
 
-    cv2.circle(frame, (cx,cy), int(t["rings_px"][0]), (255,255,0), 2)
+    # Bull
+    cv2.circle(frame, (cx,cy), int(t["rings_px"][0]/3), (255,255,255), 2)
 
+    # Rings
     for r in t["rings_px"]:
-        cv2.circle(frame, (cx,cy), int(r), (0,255,255), 2)
+        cv2.circle(frame, (cx,cy), int(r), (0,215,255), 2)
 
-    cv2.circle(frame, (cx,cy), 3, (0,0,255), -1)
+    # Center dot
+    cv2.circle(frame, (cx,cy), 2, (0,0,255), -1)
 
     return frame
+    
+    

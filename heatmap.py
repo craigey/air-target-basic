@@ -8,3 +8,13 @@ def register_hit(x,y):
 
 def get_heatmap():
     return heat
+
+def get_heatmap_normalized():
+    h = heat.copy()
+    if h.max() > 0:
+        h = (h / h.max()) * 255
+    return h.astype(np.uint8)
+
+def reset_heatmap():
+    global heat
+    heat[:] = 0
