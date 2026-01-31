@@ -1,24 +1,81 @@
-<h1>🎯 Simple Target Scoring</h1>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Target Scoring System</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
 
-<img src="/video/0">
-
-<div>
-<button onclick="fetch('/toggle')">Start / Stop Detection</button>
-<button onclick="fetch('/reset')">Reset</button>
-<a href="/calibrate">Calibration</a>
+<div class="header">
+  <h1>🎯 Electronic Target Scoring</h1>
+  <div>
+    <button class="btn btn-gold" onclick="toggle()">Start / Stop</button>
+    <button class="btn btn-red" onclick="reset()">Reset</button>
+	<button class="btn btn-gold" onclick="fetch('/toggle_heatmap')">
+  Heatmap
+</button>
+<a href="/spectator" class="btn">Spectator</a>
+<a href="/calibrate" class="btn">Calibrate</a>
+  </div>
 </div>
 
-<h3>Hits</h3>
-<table id="hits"></table>
+<div class="main">
+
+  <!-- CAMERA -->
+  <div class="panel">
+    <div class="panel-title">Live Target Feed</div>
+    <div class="viewport">
+      <img src="/video/0">
+    </div>
+    <div id="status" class="status inactive">Detection stopped</div>
+  </div>
+
+  <!-- SCORE -->
+  <div class="panel score-box">
+    <div class="panel-title">Scoring</div>
+
+    <div id="total" class="score-total">0</div>
+
+    <div id="hits" class="hit-log"></div>
+  </div>
+
+</div>
 
 <script>
-setInterval(()=>{
- fetch("/hits").then(r=>r.json()).then(data=>{
-   let html="<tr><th>#</th><th>Score</th><th>Confidence</th></tr>";
-   data.forEach((h,i)=>{
-     html+=`<tr><td>${i+1}</td><td>${h.score}</td><td>${h.confidence}</td></tr>`;
-   });
-   document.getElementById("hits").innerHTML=html;
- });
-},500);
+async function toggle() {
+  const r = await fetch("/toggle");
+  const j = await r.json();
+  const s = document.getElementById("status");
+  s.textContent = j.active ? "Detection running" : "Detection stopped";
+  s.className = "status " + (j.active ? "active" : "inactive");
+}
+
+async function reset() {
+  await fetch("/reset");
+  document.getElementById("hits").innerHTML = "";
+  document.getElementById("total").textContent = "0";
+}
+
+async function refreshHits() {
+  const r = await fetch("/hits");
+  const hits = await r.json();
+
+  const log = document.getElementById("hits");
+  log.innerHTML = "";
+
+  let total = 0;
+  hits.forEach(h => {
+    const s = document.createElement("span");
+    s.textContent = h.score;
+    log.appendChild(s);
+    total += h.score;
+  });
+
+  document.getElementById("total").textContent = total;
+}
+
+setInterval(refreshHits, 500);
 </script>
+
+</body>
+</html>

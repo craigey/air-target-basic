@@ -1,19 +1,68 @@
-<h2>Zoom & Crop Calibration</h2>
-<p>Click center → Click bull edge</p>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Calibration</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
 
-<img id="feed" src="/video/0">
+<div class="panel" style="max-width:900px;margin:auto">
+  <div class="panel-title">Calibration Wizard</div>
+
+  <p id="stepText">
+    Step 1: Click the <b>center of the bull</b>
+  </p>
+
+  <div class="viewport">
+    <img id="feed" src="/video/0">
+  </div>
+
+  <div style="margin-top:12px;text-align:center">
+    <button class="btn btn-red" onclick="resetCal()">Reset</button>
+  </div>
+</div>
 
 <script>
 let pts = [];
-document.getElementById("feed").onclick = e => {
-  pts.push({x:e.offsetX, y:e.offsetY});
-  if(pts.length==2){
-    fetch("/set_calibration",{
+const feed = document.getElementById("feed");
+const stepText = document.getElementById("stepText");
+
+feed.onclick = e => {
+  const rect = feed.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  pts.push({x,y});
+
+  if (pts.length === 1) {
+    stepText.innerHTML = "Step 2: Click the <b>edge of the bull</b>";
+  }
+
+  if (pts.length === 2) {
+    stepText.innerHTML = "Step 3: Click the <b>outer edge of the 4-ring</b>";
+  }
+
+  if (pts.length === 3) {
+    fetch("/set_calibration", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(pts)
+      body: JSON.stringify({
+        center: pts[0],
+        bull: pts[1],
+        outer: pts[2]
+      })
     });
-    alert("Calibration Saved");
+    alert("Calibration saved");
+    pts = [];
+    stepText.innerHTML = "Calibration complete ✔";
   }
+};
+
+function resetCal(){
+  pts = [];
+  stepText.innerHTML = "Step 1: Click the <b>center of the bull</b>";
 }
 </script>
+
+</body>
+</html>
