@@ -6,7 +6,7 @@ import json
 import cv2
 import threading
 from breakbeam import watch_breakbeam
-from overlay import toggle_heatmap
+from heatmap import toggle_heatmap, reset_heatmap
 
 threading.Thread(
     target=watch_breakbeam,
@@ -53,7 +53,13 @@ def reset():
 
 @app.route("/toggle_heatmap")
 def toggle_heat():
-    return {"active": toggle_heatmap()}
+    state = toggle_heatmap()
+    return {"heatmap": state}
+
+@app.route("/reset_heatmap")
+def reset_heat():
+    reset_heatmap()
+    return "OK"
 
 @app.route("/set_calibration", methods=["POST"])
 def set_cal():
