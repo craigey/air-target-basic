@@ -4,6 +4,7 @@
   "min_area": 60,
   "bull_mm": 9.525,
   "rings_mm": [25.4, 50.8, 76.2, 101.6],
-  "pellet_mm": 4.5
+  "pellet_mm": 4.5,
   "breakbeam_gpio": 17
 }
+
