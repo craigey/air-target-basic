@@ -1,6 +1,6 @@
 import cv2
 from calibration import get_target
-from heatmap import get_heat, is_enabled
+from heatmap import get_heatmap, is_enabled
 
 def draw_overlay(frame):
     t = get_target()
@@ -25,4 +25,5 @@ def draw_overlay(frame):
             cv2.circle(frame, (int(x), int(y)), 2, (0, 0, 255), -1)
 
     return frame
+
     
