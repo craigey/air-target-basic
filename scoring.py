@@ -4,29 +4,68 @@ from calibration import get_target
 
 cfg = json.load(open("config.json"))
 
-# NARPA Scoring Rules:
-# Bull (1" ring) = 5
-# Ring 1 (2" ring) = 4  
-# Ring 2 (3" ring) = 3
-# Ring 3 (4" ring) = 2
-# Outside all rings = 0
-# Optional: 5" ring = 1 (if enabled)
-# Bull hole (no mark) = 5.1 (if enabled)
+# Runtime configuration (can be changed via API)
+_scoring_config = {
+    "use_4_ring": cfg.get("use_4_ring_scoring", True),
+    "enable_bull_hole_bonus": cfg.get("enable_bull_hole_bonus", False),
+    "bull_hole_score": cfg.get("bull_hole_score", 5.1)
+}
+
+def set_scoring_config(use_4_ring=None, enable_bull_hole_bonus=None):
+    """
+    Update scoring configuration at runtime.
+    
+    Args:
+        use_4_ring: True for 4-ring (1pt outer), False for 3-ring (no outer)
+        enable_bull_hole_bonus: True to enable 5.1 scoring for bull holes
+    """
+    global _scoring_config
+    
+    if use_4_ring is not None:
+        _scoring_config["use_4_ring"] = use_4_ring
+    
+    if enable_bull_hole_bonus is not None:
+        _scoring_config["enable_bull_hole_bonus"] = enable_bull_hole_bonus
+    
+    # Save to config file
+    cfg["use_4_ring_scoring"] = _scoring_config["use_4_ring"]
+    cfg["enable_bull_hole_bonus"] = _scoring_config["enable_bull_hole_bonus"]
+    
+    with open("config.json", "w") as f:
+        json.dump(cfg, f, indent=2)
+    
+    print(f"✅ Scoring config updated: 4-ring={_scoring_config['use_4_ring']}, "
+          f"bull hole bonus={_scoring_config['enable_bull_hole_bonus']}")
+    
+    return _scoring_config
+
+
+def get_scoring_config():
+    """Get current scoring configuration."""
+    return _scoring_config.copy()
+
 
 def score_hit(x, y, area=None):
     """
-    Calculate score based on NARPA rules.
+    Calculate score based on NARPA rules with runtime configuration.
     
-    NARPA Scoring:
+    NARPA 4-Ring Scoring (default):
+    - Bull (1" ring): 5 points
+    - Ring 1 (2"): 4 points
+    - Ring 2 (3"): 3 points
+    - Ring 3 (4"): 2 points
+    - Ring 4 (5"): 1 point
+    - Outside: 0 points
+    
+    NARPA 3-Ring Scoring (optional):
     - Bull (1" ring): 5 points
     - Ring 1 (2"): 4 points
     - Ring 2 (3"): 3 points
     - Ring 3 (4"): 2 points
     - Outside: 0 points
-    - Optional Ring 4 (5"): 1 point (if enabled)
-    - Bull hole (pellet through hole): 5.1 points (if enabled)
     
-    Split shots: Majority of pellet mark determines score (scores higher)
+    Bull Hole Bonus (optional):
+    - Pellet through hole: 5.1 points
     
     Args:
         x, y: Hit position in target space (after homography)
@@ -54,42 +93,36 @@ def score_hit(x, y, area=None):
 
     # Convert distance to millimeters
     dmm = dpx * mm_per_px
-    
-    # Get pellet radius in pixels for calculations
-    pellet_px = pellet_mm / mm_per_px
 
     # Check for bull hole shot (pellet through the 3/8" hole with no mark)
-    # This is rare but scores 5.1 in some leagues
-    if cfg.get("enable_bull_hole_bonus", False) and t["bull_hole_px"]:
+    if _scoring_config["enable_bull_hole_bonus"] and t["bull_hole_px"]:
         # If very small area near center, might be bull hole shot
         if area and area < 30 and dpx < t["bull_hole_px"]:
-            return cfg.get("bull_hole_score", 5.1), 1.0
+            return _scoring_config["bull_hole_score"], 1.0
 
     # NARPA scoring with split shot logic:
     # Use the CENTER of the pellet mark for scoring
-    # This simulates "majority of pellet" rule since center represents
-    # where most of the pellet mass hit
     
     # Bull (1" ring = 25.4mm diameter) - Score 5
     bull_radius_mm = cfg["bull_mm"] / 2
     if dmm <= bull_radius_mm:
         return 5, confidence(dmm, bull_radius_mm)
     
-    # Scoring rings: 2", 3", 4" (and optional 5")
-    # Score: 4, 3, 2 (and optional 1)
-    rings_mm = cfg["rings_mm"]
-    base_score = 4
+    # Determine which rings to use based on configuration
+    if _scoring_config["use_4_ring"]:
+        # 4-ring scoring: 2", 3", 4", 5" = scores 4, 3, 2, 1
+        rings_mm = cfg["rings_mm"]  # All 4 rings
+        scores = [4, 3, 2, 1]
+    else:
+        # 3-ring scoring: 2", 3", 4" = scores 4, 3, 2
+        rings_mm = cfg["rings_mm"][:3]  # First 3 rings only
+        scores = [4, 3, 2]
     
     for i, ring_mm in enumerate(rings_mm):
         ring_radius_mm = ring_mm / 2
         
         if dmm <= ring_radius_mm:
-            score = base_score - i
-            
-            # Handle optional outer ring (4" ring scores 1 instead of 2)
-            if cfg.get("enable_outer_ring", False) and i == len(rings_mm) - 1:
-                score = 1
-            
+            score = scores[i]
             return score, confidence(dmm, ring_radius_mm)
     
     # Outside all rings - Score 0
@@ -102,9 +135,6 @@ def confidence(distance_mm, boundary_mm):
     
     For NARPA split shots: confidence decreases near boundaries
     since "majority rule" becomes harder to judge.
-    
-    Higher confidence when well within a ring.
-    Lower confidence when near boundaries (more uncertainty).
     
     Args:
         distance_mm: Actual distance from center in mm
@@ -121,7 +151,6 @@ def confidence(distance_mm, boundary_mm):
     relative_pos = distance_mm / boundary_mm
     
     # High confidence near center, drops as approaching boundary
-    # Split shots are ambiguous, so confidence drops faster near edges
     if relative_pos > 0.85:
         # Very close to boundary - low confidence (split shot zone)
         conf = 0.4
@@ -146,20 +175,30 @@ def score_distribution(hits):
         Dictionary with score statistics
     """
     if not hits:
+        max_rings = 4 if _scoring_config["use_4_ring"] else 3
+        score_dict = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0} if max_rings == 4 else {5: 0, 4: 0, 3: 0, 2: 0, 0: 0}
+        
         return {
             "total": 0,
-            "scores": {5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0},
+            "scores": score_dict,
             "average": 0.0,
             "sum": 0,
-            "bull_holes": 0
+            "bull_holes": 0,
+            "max_rings": max_rings
         }
     
     scores = [h["score"] for h in hits]
-    score_counts = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0}
+    
+    # Initialize score counts based on current configuration
+    if _scoring_config["use_4_ring"]:
+        score_counts = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0}
+    else:
+        score_counts = {5: 0, 4: 0, 3: 0, 2: 0, 0: 0}
+    
     bull_holes = 0
     
     for s in scores:
-        if s == 5.1:
+        if s == _scoring_config["bull_hole_score"]:
             bull_holes += 1
             score_counts[5] = score_counts.get(5, 0) + 1  # Count as 5 for distribution
         else:
@@ -175,7 +214,8 @@ def score_distribution(hits):
         "sum": round(total_score, 1),
         "bull_holes": bull_holes,
         "max_possible": len(hits) * 5,
-        "percentage": round((total_score / (len(hits) * 5)) * 100, 1) if len(hits) > 0 else 0
+        "percentage": round((total_score / (len(hits) * 5)) * 100, 1) if len(hits) > 0 else 0,
+        "max_rings": 4 if _scoring_config["use_4_ring"] else 3
     }
 
 
@@ -195,12 +235,15 @@ def format_round_score(hits):
     # Individual scores
     individual = [str(h["score"]) for h in hits]
     
-    output = f"Round Score: {stats['sum']}/{stats['max_possible']}\n"
+    ring_mode = "4-ring" if _scoring_config["use_4_ring"] else "3-ring"
+    
+    output = f"Round Score ({ring_mode}): {stats['sum']}/{stats['max_possible']}\n"
     output += f"Shots: {' + '.join(individual)}\n"
     output += f"Average: {stats['average']}\n"
+    output += f"Percentage: {stats['percentage']}%\n"
     
     if stats['bull_holes'] > 0:
-        output += f"Bull Holes: {stats['bull_holes']} (5.1 bonus)\n"
+        output += f"Bull Holes: {stats['bull_holes']} ({_scoring_config['bull_hole_score']} bonus)\n"
     
     # Warn if not full round
     if len(hits) < shots_per_round:
@@ -212,9 +255,6 @@ def format_round_score(hits):
 def is_split_shot(distance_mm, boundary_mm, pellet_mm):
     """
     Determine if a shot is potentially a split shot (on the line).
-    
-    A split shot is when the pellet mark touches a scoring ring boundary.
-    In NARPA rules, majority of pellet determines score (scores higher).
     
     Args:
         distance_mm: Distance from center to pellet center

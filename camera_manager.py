@@ -1,17 +1,21 @@
 import cv2
+import numpy as np
 import time
 from detection import process_frame
 from homography import warp
 
 caps = {}
 exposure_locked = {}
+zoom_levels = {}  # Track zoom level per camera
 
 def init_cameras(camera_ids=[0]):
     """
     Initialize USB cameras with optimized settings.
-    camera_ids: list of integers (default [0])
+    
+    Args:
+        camera_ids: list of camera IDs (default [0])
     """
-    global caps, exposure_locked
+    global caps, exposure_locked, zoom_levels
 
     for cam_id in camera_ids:
         cap = cv2.VideoCapture(cam_id, cv2.CAP_V4L2)
@@ -28,6 +32,7 @@ def init_cameras(camera_ids=[0]):
 
         caps[cam_id] = cap
         exposure_locked[cam_id] = False
+        zoom_levels[cam_id] = 1.0  # Default zoom
         
         print(f"✅ Initialized camera {cam_id}")
 
@@ -38,7 +43,7 @@ def lock_exposure(cam_id=0, stabilization_frames=30):
     """
     Lock camera exposure to prevent auto-adjustment during shooting.
     
-    This is critical for consistent frame differencing!
+    Critical for consistent frame differencing!
     
     Args:
         cam_id: Camera ID to lock
@@ -57,7 +62,7 @@ def lock_exposure(cam_id=0, stabilization_frames=30):
     
     print(f"📸 Stabilizing exposure for camera {cam_id}...")
     
-    # Let camera auto-adjust for a bit
+    # Let camera auto-adjust
     for i in range(stabilization_frames):
         ret, frame = cap.read()
         if not ret:
@@ -109,13 +114,93 @@ def is_exposure_locked(cam_id=0):
     return exposure_locked.get(cam_id, False)
 
 
+def set_zoom(cam_id=0, zoom_level=1.0):
+    """
+    Set digital zoom level for camera.
+    
+    Digital zoom crops and scales the image to focus on target area.
+    Useful for narrowing down where the target is.
+    
+    Args:
+        cam_id: Camera ID
+        zoom_level: Zoom factor (1.0 = no zoom, 2.0 = 2x zoom, etc.)
+    
+    Returns:
+        Actual zoom level set
+    """
+    import json
+    cfg = json.load(open("config.json"))
+    
+    min_zoom = cfg.get("min_zoom", 1.0)
+    max_zoom = cfg.get("max_zoom", 4.0)
+    
+    # Clamp zoom level
+    zoom_level = max(min_zoom, min(max_zoom, zoom_level))
+    
+    zoom_levels[cam_id] = zoom_level
+    
+    print(f"🔍 Camera {cam_id} zoom set to {zoom_level:.1f}x")
+    return zoom_level
+
+
+def adjust_zoom(cam_id=0, delta=0.1):
+    """
+    Adjust zoom level by a delta amount.
+    
+    Args:
+        cam_id: Camera ID
+        delta: Amount to change zoom (positive = zoom in, negative = zoom out)
+    
+    Returns:
+        New zoom level
+    """
+    current_zoom = zoom_levels.get(cam_id, 1.0)
+    new_zoom = current_zoom + delta
+    
+    return set_zoom(cam_id, new_zoom)
+
+
+def get_zoom(cam_id=0):
+    """Get current zoom level for camera."""
+    return zoom_levels.get(cam_id, 1.0)
+
+
+def apply_digital_zoom(frame, zoom_level=1.0):
+    """
+    Apply digital zoom to a frame.
+    
+    Args:
+        frame: Input frame
+        zoom_level: Zoom factor
+    
+    Returns:
+        Zoomed frame
+    """
+    if zoom_level <= 1.0:
+        return frame
+    
+    h, w = frame.shape[:2]
+    
+    # Calculate crop dimensions
+    crop_w = int(w / zoom_level)
+    crop_h = int(h / zoom_level)
+    
+    # Center crop
+    x1 = (w - crop_w) // 2
+    y1 = (h - crop_h) // 2
+    x2 = x1 + crop_w
+    y2 = y1 + crop_h
+    
+    # Crop and scale back to original size
+    cropped = frame[y1:y2, x1:x2]
+    zoomed = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
+    
+    return zoomed
+
+
 def optimize_camera_settings(cam_id=0):
     """
     Optimize camera settings for pellet detection.
-    
-    - Disable auto-focus if possible
-    - Set appropriate brightness/contrast
-    - Optimize for fast frame capture
     
     Args:
         cam_id: Camera ID to optimize
@@ -129,8 +214,7 @@ def optimize_camera_settings(cam_id=0):
     # Disable autofocus (keeps focus consistent)
     cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
     
-    # Set focus to infinity or mid-range (adjust based on your setup)
-    # You may need to tune this value (0-255 typical)
+    # Set focus to infinity or mid-range
     cap.set(cv2.CAP_PROP_FOCUS, 0)
     
     # Reduce brightness slightly to avoid oversaturation on white target
@@ -142,8 +226,8 @@ def optimize_camera_settings(cam_id=0):
     # Maximize frame rate
     cap.set(cv2.CAP_PROP_FPS, 30)
     
-    # Disable any image processing that might cause inconsistency
-    cap.set(cv2.CAP_PROP_GAIN, 0)  # Disable automatic gain
+    # Disable automatic gain
+    cap.set(cv2.CAP_PROP_GAIN, 0)
     
     print(f"✅ Camera {cam_id} optimized")
 
@@ -166,11 +250,42 @@ def get_frame(cam_id=0):
     if not ret:
         return None
 
+    # Apply digital zoom if set
+    zoom = zoom_levels.get(cam_id, 1.0)
+    if zoom > 1.0:
+        frame = apply_digital_zoom(frame, zoom)
+    
     # Apply perspective warp if configured
     frame = warp(frame)
     
     # Process for detection
     return process_frame(frame, cam_id)
+
+
+def get_raw_frame(cam_id=0):
+    """
+    Get raw frame without processing (for calibration, etc.).
+    
+    Args:
+        cam_id: Camera ID
+    
+    Returns:
+        Raw frame with zoom applied
+    """
+    cap = caps.get(cam_id)
+    if cap is None:
+        return None
+
+    ret, frame = cap.read()
+    if not ret:
+        return None
+
+    # Apply digital zoom if set
+    zoom = zoom_levels.get(cam_id, 1.0)
+    if zoom > 1.0:
+        frame = apply_digital_zoom(frame, zoom)
+    
+    return frame
 
 
 def get_camera_info(cam_id=0):
@@ -195,7 +310,8 @@ def get_camera_info(cam_id=0):
         "auto_exposure": int(cap.get(cv2.CAP_PROP_AUTO_EXPOSURE)),
         "brightness": int(cap.get(cv2.CAP_PROP_BRIGHTNESS)),
         "contrast": int(cap.get(cv2.CAP_PROP_CONTRAST)),
-        "exposure_locked": exposure_locked.get(cam_id, False)
+        "exposure_locked": exposure_locked.get(cam_id, False),
+        "zoom": zoom_levels.get(cam_id, 1.0)
     }
 
 
@@ -206,4 +322,5 @@ def release_cameras():
     
     caps.clear()
     exposure_locked.clear()
+    zoom_levels.clear()
     print("📷 All cameras released")
