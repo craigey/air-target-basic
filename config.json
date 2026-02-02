@@ -1,10 +1,28 @@
 {
   "cameras": [0],
   "threshold": 18,
-  "min_area": 60,
+  "min_area": 40,
+  "max_area": 400,
   "bull_mm": 9.525,
   "rings_mm": [25.4, 50.8, 76.2, 101.6],
   "pellet_mm": 4.5,
-  "breakbeam_gpio": 17
+  "breakbeam_gpio": 17,
+  
+  "_comment_detection": "Detection algorithm settings",
+  "adaptive_threshold": true,
+  "color_detection": true,
+  "grey_threshold": 15,
+  "min_confidence": 0.6,
+  "min_circularity": 0.5,
+  
+  "_comment_baseline": "Baseline update strategy",
+  "baseline_update_mode": "selective",
+  
+  "_comment_cooldown": "Shot detection cooldown",
+  "shot_cooldown_frames": 15,
+  
+  "_comment_camera": "Camera optimization settings",
+  "auto_lock_exposure": true,
+  "exposure_stabilization_frames": 30,
+  "optimize_camera_on_start": true
 }
-
