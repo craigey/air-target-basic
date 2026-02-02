@@ -11,6 +11,7 @@ def score_hit(x,y):
 
     dpx = math.dist((x,y), center)
 
+    pellet = cfg["pellet_mm"] / 2  # radius
     bull_mm = cfg["bull_mm"]
     rings_mm = cfg["rings_mm"]
 
@@ -18,11 +19,11 @@ def score_hit(x,y):
 
     dmm = dpx * px_to_mm
 
-    if dmm <= bull_mm/2:
+    if dmm - pellet <= bull_mm / 2:
         return 5, confidence(dmm, bull_mm/2)
 
     for i, r in enumerate(rings_mm):
-        if dmm <= r/2:
+        if dmm - pellet <= r / 2:
             return 4-i, confidence(dmm, r/2)
 
     return 0, 0.7

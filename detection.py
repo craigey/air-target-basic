@@ -6,6 +6,7 @@ from scoring import score_hit
 from heatmap import register_hit
 from ai_classifier import classify_hit
 from overlay import draw_overlay
+from calibration import warp_point   # 🔹 ADD THIS
 
 cfg = json.load(open("config.json"))
 
@@ -51,7 +52,9 @@ def process_frame(frame, cam_id):
 
     # ---------- Detection ON ----------
     diff = cv2.absdiff(gray, baseline[cam_id])
-    _, thresh = cv2.threshold(diff, cfg["threshold"], 255, cv2.THRESH_BINARY)
+    _, thresh = cv2.threshold(
+        diff, cfg["threshold"], 255, cv2.THRESH_BINARY
+    )
 
     thresh = cv2.morphologyEx(
         thresh, cv2.MORPH_OPEN, np.ones((3, 3))
@@ -69,10 +72,11 @@ def process_frame(frame, cam_id):
         if M["m00"] == 0:
             continue
 
+        # 🔹 RAW hit position (camera space)
         x = M["m10"] / M["m00"]
         y = M["m01"] / M["m00"]
 
-        # Small crop for AI classifier
+        # ---------- AI classifier uses RAW coords ----------
         x0, y0 = int(x - 8), int(y - 8)
         crop = gray[y0:y0 + 16, x0:x0 + 16]
 
@@ -83,19 +87,30 @@ def process_frame(frame, cam_id):
         if prob < 0.6:
             continue
 
-        score, conf = score_hit(x, y)
+        # 🔥 APPLY HOMOGRAPHY HERE (THIS IS THE ANSWER)
+        wx, wy = warp_point(x, y)
+
+        # ---------- Scoring (warped space) ----------
+        score, conf = score_hit(wx, wy)
 
         hits.append({
-            "x": round(x, 2),
-            "y": round(y, 2),
+            "x": round(wx, 2),
+            "y": round(wy, 2),
             "score": score,
             "confidence": conf,
             "ai_prob": prob
         })
 
-        register_hit(x, y)
+        register_hit(wx, wy)
 
-        cv2.circle(frame, (int(x), int(y)), 6, (0, 0, 255), 2)
+        # ---------- Visualization ----------
+        cv2.circle(
+            frame,
+            (int(wx), int(wy)),
+            6,
+            (0, 0, 255),
+            2
+        )
 
     baseline[cam_id] = gray.copy()
     return draw_overlay(frame)
