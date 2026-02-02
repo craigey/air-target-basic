@@ -16,6 +16,7 @@ baseline_color = {}  # For color-based detection
 hits = []
 detect_active = False
 shot_cooldown = 0
+last_shot_time = 0
 
 def toggle_detection():
     global detect_active, hits
@@ -41,7 +42,14 @@ def get_hits():
 def detect_grey_marks(frame, baseline_frame):
     """
     Detect grey pellet marks on white TiO2 paint using color information.
-    Grey marks have lower saturation and value than white background.
+    
+    For NARPA targets:
+    - White titanium-dioxide paint background
+    - Grey lead pellet marks
+    - Detection uses HSV color space
+    
+    Returns:
+        Binary mask of detected grey marks
     """
     # Convert to HSV for better color detection
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -54,8 +62,9 @@ def detect_grey_marks(frame, baseline_frame):
     # Detect darkening (grey marks on white)
     value_diff = cv2.absdiff(value_baseline, value)
     
-    # Grey marks: significant darkening (>15 on 0-255 scale)
-    _, grey_mask = cv2.threshold(value_diff, cfg.get("grey_threshold", 15), 255, cv2.THRESH_BINARY)
+    # Grey marks: significant darkening (>grey_threshold on 0-255 scale)
+    grey_threshold = cfg.get("grey_threshold", 15)
+    _, grey_mask = cv2.threshold(value_diff, grey_threshold, 255, cv2.THRESH_BINARY)
     
     # Also check saturation - grey is low saturation
     sat = hsv[:, :, 1]
@@ -63,13 +72,17 @@ def detect_grey_marks(frame, baseline_frame):
     sat_diff = cv2.absdiff(sat, sat_baseline)
     
     # Combine: darkening AND low saturation change
+    # This filters out shadows which change saturation more
     combined = cv2.bitwise_and(grey_mask, grey_mask, mask=(sat_diff < 30).astype(np.uint8) * 255)
     
     return combined
 
 
 def process_frame(frame, cam_id):
-    global baseline, baseline_color, shot_cooldown
+    global baseline, baseline_color, shot_cooldown, last_shot_time
+    
+    import time
+    current_time = time.time()
 
     # Apply Gaussian blur to reduce noise
     frame = cv2.GaussianBlur(frame, (5, 5), 0)
@@ -105,7 +118,7 @@ def process_frame(frame, cam_id):
             diff_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
         )
     
-    # METHOD 2: Color-based grey mark detection
+    # METHOD 2: Color-based grey mark detection (for TiO2 paint)
     if cfg.get("color_detection", True):
         grey_mask = detect_grey_marks(frame, baseline_color[cam_id])
         # Combine both methods - either can detect
@@ -126,9 +139,12 @@ def process_frame(frame, cam_id):
         area = cv2.contourArea(c)
         
         # Check area bounds
-        if area < cfg.get("min_area", 40):
+        min_area = cfg.get("min_area", 40)
+        max_area = cfg.get("max_area", 400)
+        
+        if area < min_area:
             continue
-        if area > cfg.get("max_area", 400):
+        if area > max_area:
             continue
 
         M = cv2.moments(c)
@@ -153,7 +169,9 @@ def process_frame(frame, cam_id):
 
         # Check circularity and get AI probability
         prob = classify_hit(crop, c)
-        if prob < cfg.get("min_confidence", 0.6):
+        min_confidence = cfg.get("min_confidence", 0.6)
+        
+        if prob < min_confidence:
             continue
 
         # APPLY HOMOGRAPHY (camera → target space)
@@ -161,6 +179,7 @@ def process_frame(frame, cam_id):
 
         # --- Spatial duplicate check ---
         # Don't detect the same hole twice (within 10px)
+        # Important for NARPA since we're not erasing marks
         too_close = False
         for prev_hit in hits[-5:]:  # Check last 5 hits
             if math.dist((wx, wy), (prev_hit["x"], prev_hit["y"])) < 10:
@@ -171,43 +190,80 @@ def process_frame(frame, cam_id):
             continue
 
         # --- Shot cooldown gating ---
+        # NARPA: minimum 0.3s between shots (typically much longer)
         if shot_cooldown > 0:
             continue
 
+        # --- Maximum shot interval check ---
+        # If too much time has passed, might want to reset baseline
+        max_interval = cfg.get("max_shot_interval_seconds", 120)
+        if last_shot_time > 0 and (current_time - last_shot_time) > max_interval:
+            print(f"ℹ️ Long interval detected ({current_time - last_shot_time:.1f}s) - baseline may need refresh")
+
         # Score using warped coordinates
-        score, conf = score_hit(wx, wy)
+        # Pass area for bull hole detection (small area + center position = 5.1)
+        score, conf = score_hit(wx, wy, area)
 
         # Reject invalid scores
         if score is None or conf < 0.5:
             continue
 
-        hits.append({
+        # Record hit
+        hit_data = {
             "x": round(wx, 2),
             "y": round(wy, 2),
             "score": score,
             "confidence": conf,
-            "ai_prob": prob
-        })
+            "ai_prob": prob,
+            "area": area,
+            "timestamp": current_time
+        }
+        
+        hits.append(hit_data)
+        last_shot_time = current_time
 
         register_hit(wx, wy)
 
         # Draw detection circle on original frame
-        cv2.circle(frame, (int(x), int(y)), 6, (0, 0, 255), 2)
+        # Color based on score: Bull=green, others=red, miss=blue
+        if score >= 5:
+            color = (0, 255, 0)  # Green for bull
+        elif score > 0:
+            color = (0, 0, 255)  # Red for scoring
+        else:
+            color = (255, 0, 0)  # Blue for miss
+            
+        cv2.circle(frame, (int(x), int(y)), 6, color, 2)
+        
+        # Display score on frame
+        cv2.putText(frame, str(score), (int(x) + 10, int(y) - 10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
         # Lock out further detections for configured frames
-        shot_cooldown = cfg.get("shot_cooldown_frames", 15)
+        # 0.3s at 30fps = 9 frames
+        shot_cooldown = cfg.get("shot_cooldown_frames", 9)
+        
+        # Log the shot
+        shots_per_round = cfg.get("shots_per_round", 6)
+        shot_num = len(hits)
+        print(f"🎯 Shot {shot_num}: Score {score} (confidence {conf:.2f})")
+        
+        # Warn when round is complete
+        if shot_num == shots_per_round:
+            print(f"✅ Round complete! Total: {sum(h['score'] for h in hits)}/{shots_per_round * 5}")
 
     # Decrement cooldown each frame
     if shot_cooldown > 0:
         shot_cooldown -= 1
 
     # Selective baseline update - avoid areas with recent hits
-    if shot_cooldown == 0 and cfg.get("baseline_update_mode", "selective") == "selective":
+    baseline_mode = cfg.get("baseline_update_mode", "selective")
+    
+    if shot_cooldown == 0 and baseline_mode == "selective":
         # Create a mask excluding recent hit locations
         mask = np.ones(gray.shape, dtype=np.uint8) * 255
         for hit in hits[-5:]:  # Last 5 hits
             # Convert back to camera space for masking
-            # (Approximate - ideally would inverse-warp, but this works)
             cv2.circle(mask, (int(hit["x"]), int(hit["y"])), 20, 0, -1)
         
         # Update only non-hit areas
@@ -216,10 +272,35 @@ def process_frame(frame, cam_id):
         # Update color baseline similarly
         mask_3ch = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
         baseline_color[cam_id] = np.where(mask_3ch > 0, frame, baseline_color[cam_id])
-    elif cfg.get("baseline_update_mode", "selective") == "always":
-        # Original behavior - continuous update
+        
+    elif baseline_mode == "always":
+        # Continuous update (original behavior)
         baseline[cam_id] = gray.copy()
         baseline_color[cam_id] = frame.copy()
-    # else: "never" mode - don't update
+        
+    # else: "never" mode - don't update (useful for testing)
 
     return draw_overlay(frame)
+
+
+def get_round_summary():
+    """
+    Get summary of current round for NARPA scoring.
+    
+    Returns:
+        Dictionary with round statistics
+    """
+    from scoring import score_distribution, format_round_score
+    
+    stats = score_distribution(hits)
+    shots_per_round = cfg.get("shots_per_round", 6)
+    
+    return {
+        "hits": hits,
+        "total_shots": len(hits),
+        "total_score": stats["sum"],
+        "max_possible": shots_per_round * 5,
+        "average": stats["average"],
+        "complete": len(hits) >= shots_per_round,
+        "formatted": format_round_score(hits)
+    }
