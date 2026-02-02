@@ -36,7 +36,7 @@ def get_hits():
 
 
 def process_frame(frame, cam_id):
-    global baseline
+    global baseline, shot_cooldown
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -87,37 +87,38 @@ def process_frame(frame, cam_id):
         if prob < 0.6:
             continue
 
-        # 🔥 APPLY HOMOGRAPHY HERE (THIS IS THE ANSWER)
+        # 🔹 APPLY HOMOGRAPHY (camera → target space)
         wx, wy = warp_point(x, y)
-
-        global shot_cooldown
 
         # --- Shot gating ---
         if shot_cooldown > 0:
             continue
 
-        score, conf = score_hit(x, y)
+        # Score using warped coordinates
+        score, conf = score_hit(wx, wy)
 
         # Reject invalid scores completely
-        if score is None:
+        #if score is None:
+        if score is None or conf < 0.5:
             continue
 
         hits.append({
-            "x": round(x, 2),
-            "y": round(y, 2),
+            "x": round(wx, 2),
+            "y": round(wy, 2),
             "score": score,
             "confidence": conf,
             "ai_prob": prob
         })
 
-        register_hit(x, y)
+        register_hit(wx, wy)
 
         cv2.circle(frame, (int(x), int(y)), 6, (0, 0, 255), 2)
 
         # Lock out further detections for ~0.5s
         shot_cooldown = 15
 
-if shot_cooldown > 0:
+    # ✅ Decrement cooldown each frame
+    if shot_cooldown > 0:
         shot_cooldown -= 1
 
     baseline[cam_id] = gray.copy()
