@@ -13,7 +13,7 @@ cfg = json.load(open("config.json"))
 baseline = {}
 hits = []
 detect_active = False
-
+shot_cooldown = 0
 
 def toggle_detection():
     global detect_active, hits
@@ -90,27 +90,35 @@ def process_frame(frame, cam_id):
         # 🔥 APPLY HOMOGRAPHY HERE (THIS IS THE ANSWER)
         wx, wy = warp_point(x, y)
 
-        # ---------- Scoring (warped space) ----------
-        score, conf = score_hit(wx, wy)
+        global shot_cooldown
+
+        # --- Shot gating ---
+        if shot_cooldown > 0:
+            continue
+
+        score, conf = score_hit(x, y)
+
+        # Reject invalid scores completely
+        if score is None:
+            continue
 
         hits.append({
-            "x": round(wx, 2),
-            "y": round(wy, 2),
+            "x": round(x, 2),
+            "y": round(y, 2),
             "score": score,
             "confidence": conf,
             "ai_prob": prob
         })
 
-        register_hit(wx, wy)
+        register_hit(x, y)
 
-        # ---------- Visualization ----------
-        cv2.circle(
-            frame,
-            (int(wx), int(wy)),
-            6,
-            (0, 0, 255),
-            2
-        )
+        cv2.circle(frame, (int(x), int(y)), 6, (0, 0, 255), 2)
+
+        # Lock out further detections for ~0.5s
+        shot_cooldown = 15
+
+if shot_cooldown > 0:
+        shot_cooldown -= 1
 
     baseline[cam_id] = gray.copy()
     return draw_overlay(frame)

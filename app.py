@@ -66,6 +66,10 @@ def set_cal():
     data = request.json
     set_calibration(data)
     return "OK"
+    
+@app.route("/calibrate")
+def calibrate():
+    return render_template("calibrate.html")    
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
