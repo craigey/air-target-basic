@@ -6,17 +6,20 @@ sudo apt update
 sudo apt install -y \
     python3 \
     python3-pip \
+    python3-rpi.gpio \
     python3-venv \
     python3-opencv \
     libatlas-base-dev
 
 echo "🐍 Creating virtual environment..."
-python3 -m venv venv
+python3 -m venv venv --system-site-packages
 
 echo "📦 Activating venv & installing Python deps..."
 source venv/bin/activate
 pip install --upgrade pip
 pip install flask numpy scipy
+pip3 -install python3-opencv
 
 echo "✅ Setup complete"
+
 echo "➡ Run with: source venv/bin/activate && python app.py"
