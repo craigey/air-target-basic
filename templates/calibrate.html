@@ -1,67 +1,333 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Calibration</title>
+  <title>Calibration Wizard</title>
   <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .nav-bar {
+      background: #0a0a0a;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+      margin-bottom: 20px;
+    }
+    .nav-btn {
+      background: #222;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid #444;
+      display: inline-block;
+      margin-right: 10px;
+    }
+    .nav-btn:hover {
+      background: #333;
+      border-color: #666;
+    }
+    .camera-select {
+      background: #000;
+      color: #c5a000;
+      border: 1px solid #444;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+    .step-indicator {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      border: 2px solid #c5a000;
+    }
+    .calibration-point {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #4CAF50;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      pointer-events: none;
+    }
+    .viewport {
+      position: relative;
+      cursor: crosshair;
+    }
+    .help-text {
+      background: #0a0a0a;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 15px 0;
+      border: 1px solid #444;
+      color: #888;
+      font-size: 13px;
+    }
+    .success-message {
+      background: #1a4d1a;
+      color: #4f8;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      border: 2px solid #4f8;
+      display: none;
+    }
+  </style>
 </head>
 <body>
 
+<!-- Navigation Bar -->
+<div class="nav-bar">
+  <div>
+    <a href="/" class="nav-btn">← Back to Main</a>
+    <a href="/spectator_fullscreen" class="nav-btn">Spectator</a>
+    <a href="/rounds" class="nav-btn">Rounds</a>
+  </div>
+  <div>
+    <span style="color: #888; font-size: 12px; margin-right: 10px;">Calibrate Camera:</span>
+    <select id="cameraSelect" class="camera-select" onchange="changeCamera()">
+      <!-- Populated dynamically -->
+    </select>
+  </div>
+</div>
+
 <div class="panel" style="max-width:900px;margin:auto">
-  <div class="panel-title">Calibration Wizard</div>
+  <div class="panel-title">🎯 Calibration Wizard - Camera <span id="currentCamLabel">0</span></div>
 
-  <p id="stepText">
-    Step 1: Click the <b>center of the bull</b>
-  </p>
+  <div class="step-indicator">
+    <p id="stepText" style="margin: 0; font-size: 16px; font-weight: 700; color: #c5a000;">
+      Step 1: Click the <b>center of the bull hole</b>
+    </p>
+  </div>
 
-  <div class="viewport">
-    <img id="feed" src="/video/0">
+  <div class="help-text">
+    <strong>Instructions:</strong>
+    <ul style="margin: 5px 0 0 20px; padding: 0;">
+      <li>Click exactly on the CENTER of the 3/8" bull hole</li>
+      <li>Click on the EDGE of the 1" bull scoring ring</li>
+      <li>Click on the EDGE of the 4" outer ring</li>
+      <li>Green dots show your clicks</li>
+      <li>Use the Reset button to start over</li>
+    </ul>
+  </div>
+
+  <div class="viewport" id="viewport">
+    <img id="feed" src="/raw_video/0" onerror="handleVideoError()">
+    <!-- Calibration points will be added here -->
+  </div>
+
+  <div class="success-message" id="successMessage">
+    ✅ Calibration saved successfully!
+    <div style="margin-top: 8px;">
+      <strong>Quality:</strong> <span id="qualityValue">-</span>
+      <span id="qualityWarning" style="color: #f44; display: none; margin-left: 10px;">⚠️ Quality below 0.75 - consider recalibrating</span>
+    </div>
   </div>
 
   <div style="margin-top:12px;text-align:center">
-    <button class="btn btn-red" onclick="resetCal()">Reset</button>
+    <button class="btn btn-red" onclick="resetCal()">Reset Points</button>
+    <button class="btn btn-gold" onclick="testCalibration()">Test Calibration</button>
+    <a href="/" class="btn">Done - Return to Main</a>
+  </div>
+
+  <div class="help-text" style="margin-top: 15px;">
+    <strong>💡 Tips:</strong>
+    <ul style="margin: 5px 0 0 20px; padding: 0;">
+      <li>Ensure camera zoom and rotation are set BEFORE calibrating</li>
+      <li>Lock exposure and white balance for consistent calibration</li>
+      <li>Target should be well-lit and clearly visible</li>
+      <li>Calibrate each camera individually</li>
+      <li>Quality should be > 0.75 for best accuracy</li>
+    </ul>
   </div>
 </div>
 
 <script>
 let pts = [];
+let currentCamera = 0;
 const feed = document.getElementById("feed");
 const stepText = document.getElementById("stepText");
+const viewport = document.getElementById("viewport");
+
+// Initialize
+window.onload = function() {
+  initCameras();
+};
+
+// ========== Camera Selection ==========
+
+async function initCameras() {
+  try {
+    const response = await fetch('/camera_urls');
+    const data = await response.json();
+    
+    const select = document.getElementById('cameraSelect');
+    select.innerHTML = '';
+    
+    data.cameras.forEach(cam => {
+      const option = document.createElement('option');
+      option.value = cam.camera_id;
+      option.textContent = `Camera ${cam.camera_id} (Lane ${cam.lane})`;
+      select.appendChild(option);
+    });
+    
+    if (data.cameras.length > 0) {
+      currentCamera = data.cameras[0].camera_id;
+      changeCamera();
+    }
+  } catch (err) {
+    console.error('Failed to load cameras:', err);
+    const select = document.getElementById('cameraSelect');
+    select.innerHTML = '<option value="0">Camera 0 (Lane 1)</option>';
+  }
+}
+
+function changeCamera() {
+  currentCamera = parseInt(document.getElementById('cameraSelect').value);
+  
+  // Use raw video feed to avoid detection overlay interference
+  feed.src = `/raw_video/${currentCamera}`;
+  document.getElementById('currentCamLabel').textContent = currentCamera;
+  
+  // Reset calibration when changing cameras
+  resetCal();
+}
+
+function handleVideoError() {
+  console.error('Video feed error');
+  stepText.innerHTML = '<span style="color: #f44;">⚠️ Camera feed error - check camera connection</span>';
+}
+
+// ========== Calibration Points ==========
 
 feed.onclick = e => {
   const rect = feed.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
 
-  pts.push({x,y});
+  // Scale to image coordinates
+  const scaleX = feed.naturalWidth / rect.width;
+  const scaleY = feed.naturalHeight / rect.height;
+  
+  const imageX = x * scaleX;
+  const imageY = y * scaleY;
+
+  pts.push({x: imageX, y: imageY});
+
+  // Add visual marker
+  const marker = document.createElement('div');
+  marker.className = 'calibration-point';
+  marker.style.left = x + 'px';
+  marker.style.top = y + 'px';
+  viewport.appendChild(marker);
 
   if (pts.length === 1) {
-    stepText.innerHTML = "Step 2: Click the <b>edge of the bull</b>";
+    stepText.innerHTML = "Step 2: Click the <b>edge of the 1\" bull scoring ring</b>";
   }
 
   if (pts.length === 2) {
-    stepText.innerHTML = "Step 3: Click the <b>outer edge of the 4-ring</b>";
+    stepText.innerHTML = "Step 3: Click the <b>outer edge of the 4\" ring</b>";
   }
 
   if (pts.length === 3) {
-    fetch("/set_calibration", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
+    saveCalibration();
+  }
+};
+
+// ========== Save Calibration ==========
+
+async function saveCalibration() {
+  try {
+    stepText.innerHTML = "⏳ Saving calibration...";
+    
+    const response = await fetch("/set_calibration", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
+        camera_id: currentCamera,
         center: pts[0],
         bull: pts[1],
         outer: pts[2]
       })
     });
-    alert("Calibration saved");
-    pts = [];
-    stepText.innerHTML = "Calibration complete ✔";
-  }
-};
 
-function resetCal(){
-  pts = [];
-  stepText.innerHTML = "Step 1: Click the <b>center of the bull</b>";
+    const result = await response.json();
+    
+    // Show success message
+    document.getElementById('successMessage').style.display = 'block';
+    document.getElementById('qualityValue').textContent = (result.quality || 0).toFixed(2);
+    
+    if (result.quality < 0.75) {
+      document.getElementById('qualityWarning').style.display = 'inline';
+    } else {
+      document.getElementById('qualityWarning').style.display = 'none';
+    }
+    
+    stepText.innerHTML = "✅ Calibration complete! You can recalibrate or return to main.";
+    
+    // Keep points visible but allow new calibration
+    setTimeout(() => {
+      // Don't auto-reset - let user decide
+    }, 2000);
+    
+  } catch (err) {
+    console.error('Calibration save failed:', err);
+    stepText.innerHTML = '<span style="color: #f44;">❌ Calibration failed - please try again</span>';
+    setTimeout(resetCal, 3000);
+  }
 }
+
+// ========== Reset ==========
+
+function resetCal() {
+  pts = [];
+  
+  // Remove all markers
+  const markers = viewport.querySelectorAll('.calibration-point');
+  markers.forEach(m => m.remove());
+  
+  // Hide success message
+  document.getElementById('successMessage').style.display = 'none';
+  
+  stepText.innerHTML = "Step 1: Click the <b>center of the bull hole</b>";
+}
+
+// ========== Test Calibration ==========
+
+async function testCalibration() {
+  try {
+    const response = await fetch(`/camera_info/${currentCamera}`);
+    const data = await response.json();
+    
+    alert(`Camera ${currentCamera} Settings:
+    
+Zoom: ${data.zoom.toFixed(1)}x
+Rotation: ${data.rotation}°
+Exposure: ${data.exposure_locked ? 'Locked' : 'Auto'}
+White Balance: ${data.white_balance_locked ? 'Locked' : 'Auto'}
+
+Make sure these settings are correct before calibrating.`);
+  } catch (err) {
+    alert('Failed to get camera info');
+  }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'r' || e.key === 'R') {
+    resetCal();
+  }
+  if (e.key === 'Escape') {
+    window.location.href = '/';
+  }
+});
 </script>
 
 </body>
