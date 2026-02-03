@@ -5,15 +5,10 @@ import json
 
 cfg = json.load(open("config.json"))
 
-_homography = None
-_homography_quality = 0.0
-
-_target = {
-    "center": None,
-    "rings_px": [],
-    "scale_mm": None,
-    "bull_hole_px": None
-}
+# Store calibration per camera
+_homography = {}
+_homography_quality = {}
+_target = {}
 
 # NARPA Official Target Dimensions (mm)
 BULL_HOLE_MM = cfg["bull_hole_mm"]  # 3/8" hole (9.525mm)
@@ -35,6 +30,7 @@ def set_calibration(data):
     - Outer: Edge of the 4" ring (or 3" if no outer ring)
     
     data must contain:
+    - camera_id: Camera ID (optional, defaults to 0)
     - center: {x,y} - center of bull hole
     - bull: {x,y} - point on bull scoring ring edge
     - outer: {x,y} - point on outer ring edge
@@ -42,6 +38,8 @@ def set_calibration(data):
     - dst_pts: list of 4 corrected points (optional for homography)
     """
     global _homography, _homography_quality, _target
+    
+    cam_id = data.get("camera_id", 0)
 
     cx, cy = int(data["center"]["x"]), int(data["center"]["y"])
 
@@ -84,21 +82,25 @@ def set_calibration(data):
     # Calculate bull hole size in pixels (3/8" = 9.525mm diameter)
     bull_hole_px = (BULL_HOLE_MM / 2) / mm_per_px if mm_per_px > 0 else 0
 
-    _target["center"] = (cx, cy)
-    _target["scale_mm"] = mm_per_px
-    _target["bull_hole_px"] = bull_hole_px
+    # Initialize camera target if not exists
+    if cam_id not in _target:
+        _target[cam_id] = {}
+    
+    _target[cam_id]["center"] = (cx, cy)
+    _target[cam_id]["scale_mm"] = mm_per_px
+    _target[cam_id]["bull_hole_px"] = bull_hole_px
     
     # Calculate all ring radii in pixels
-    _target["rings_px"] = [
+    _target[cam_id]["rings_px"] = [
         (mm / 2) / mm_per_px for mm in [BULL_MM] + RINGS_MM
     ]
 
-    print(f"✅ NARPA Target Calibration:")
+    print(f"✅ NARPA Target Calibration (Camera {cam_id}):")
     print(f"   Scale: {mm_per_px:.4f} mm/px")
     print(f"   Bull ring: {bull_r:.1f}px (1\" = 25.4mm)")
     print(f"   Bull hole: {bull_hole_px:.1f}px (3/8\" = 9.525mm)")
     print(f"   Outer ring: {outer_r:.1f}px ({outer_mm/25.4:.1f}\" = {outer_mm:.1f}mm)")
-    print(f"   Ring radii (px): {[f'{r:.1f}' for r in _target['rings_px']]}")
+    print(f"   Ring radii (px): {[f'{r:.1f}' for r in _target[cam_id]['rings_px']]}")
 
     # HOMOGRAPHY with RANSAC for robustness
     if "src_pts" in data and "dst_pts" in data and len(data["src_pts"]) >= 4:
@@ -106,18 +108,19 @@ def set_calibration(data):
         dst = np.array(data["dst_pts"], dtype=np.float32)
         
         # Use RANSAC to reject outliers
-        _homography, mask = cv2.findHomography(src, dst, cv2.RANSAC, 5.0)
+        H, mask = cv2.findHomography(src, dst, cv2.RANSAC, 5.0)
+        _homography[cam_id] = H
         
-        if _homography is not None and mask is not None:
+        if H is not None and mask is not None:
             inliers = np.sum(mask)
-            _homography_quality = inliers / len(mask)
+            _homography_quality[cam_id] = inliers / len(mask)
             
             # Calculate reprojection error
-            error = calculate_reprojection_error(_homography, src, dst)
+            error = calculate_reprojection_error(_homography[cam_id], src, dst)
             
             print(f"✅ Homography: {inliers}/{len(mask)} inliers, error={error:.2f}px")
             
-            if _homography_quality < 0.75:
+            if _homography_quality[cam_id] < 0.75:
                 print("⚠️ Warning: Low homography quality (<75%) - consider recalibrating")
         else:
             print("⚠️ Warning: Homography calculation failed")
@@ -141,49 +144,71 @@ def calculate_reprojection_error(homography, src_pts, dst_pts):
     return float(np.mean(errors))
 
 
-def warp_point(x, y):
+def warp_point(x, y, cam_id=0):
     """
     Transform a point from camera space to target space using homography.
     
     Args:
         x, y: Point in camera coordinates
+        cam_id: Camera ID (default 0)
     
     Returns:
         (wx, wy): Point in target coordinates
     """
-    if _homography is None:
+    if cam_id not in _homography or _homography[cam_id] is None:
         return int(x), int(y)
 
     pt = np.array([[[x, y]]], dtype=np.float32)
-    warped = cv2.perspectiveTransform(pt, _homography)
+    warped = cv2.perspectiveTransform(pt, _homography[cam_id])
     return int(warped[0][0][0]), int(warped[0][0][1])
 
 
-def get_target():
-    """Get current target calibration data."""
-    return _target
+def get_target(cam_id=0):
+    """Get current target calibration data for specific camera."""
+    if cam_id not in _target:
+        # Return default empty target
+        return {
+            "center": None,
+            "rings_px": [],
+            "scale_mm": None,
+            "bull_hole_px": None
+        }
+    return _target[cam_id]
 
 
-def get_calibration_quality():
-    """Get homography quality metric (0.0-1.0)."""
-    return _homography_quality
+def get_calibration_quality(cam_id=0):
+    """Get homography quality metric (0.0-1.0) for specific camera."""
+    return _homography_quality.get(cam_id, 0.0)
 
 
-def is_calibrated():
-    """Check if system is calibrated."""
-    return _target["center"] is not None and _target["scale_mm"] is not None
+def is_calibrated(cam_id=0):
+    """Check if system is calibrated for specific camera."""
+    if cam_id not in _target:
+        return False
+    return _target[cam_id].get("center") is not None and _target[cam_id].get("scale_mm") is not None
 
 
-def reset_calibration():
-    """Clear all calibration data."""
+def reset_calibration(cam_id=None):
+    """
+    Clear calibration data.
+    
+    Args:
+        cam_id: Camera ID to reset, or None to reset all cameras
+    """
     global _homography, _homography_quality, _target
     
-    _homography = None
-    _homography_quality = 0.0
-    _target = {
-        "center": None,
-        "rings_px": [],
-        "scale_mm": None,
-        "bull_hole_px": None
-    }
-    print("🔄 Calibration reset")
+    if cam_id is None:
+        # Reset all cameras
+        _homography = {}
+        _homography_quality = {}
+        _target = {}
+        print("🔄 All calibrations reset")
+    else:
+        # Reset specific camera
+        if cam_id in _homography:
+            del _homography[cam_id]
+        if cam_id in _homography_quality:
+            del _homography_quality[cam_id]
+        if cam_id in _target:
+            del _target[cam_id]
+        print(f"🔄 Calibration reset for camera {cam_id}")
