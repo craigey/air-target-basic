@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multi-Camera Spectator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a0a0a;
+            color: #f0f0f0;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+        }
+        .header {
+            background: #161616;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #333;
+        }
+        .header h1 {
+            font-size: 24px;
+            color: #c5a000;
+            margin: 0;
+        }
+        .layout-controls {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: #333;
+            border-color: #666;
+        }
+        .btn.active {
+            background: #06c;
+            border-color: #06c;
+        }
+        .grid-container {
+            height: calc(100vh - 70px);
+            padding: 15px;
+            display: grid;
+            gap: 15px;
+            transition: all 0.3s;
+        }
+        
+        /* Layout modes */
+        .grid-1 { grid-template-columns: 1fr; }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-3 { grid-template-columns: repeat(2, 1fr); }
+        .grid-4 { grid-template-columns: repeat(2, 1fr); }
+        
+        .camera-lane {
+            background: #161616;
+            border: 2px solid #333;
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        .lane-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+        .lane-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #c5a000;
+        }
+        .lane-status {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+        .status-active {
+            background: #1a4d1a;
+            color: #4f8;
+        }
+        .status-inactive {
+            background: #4d1a1a;
+            color: #f44;
+        }
+        .video-container {
+            flex: 1;
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .video-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #666;
+            font-size: 14px;
+        }
+        .score-display {
+            margin-top: 10px;
+            background: #000;
+            padding: 12px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .shots-container {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .shot-badge {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 20px;
+            border: 2px solid;
+        }
+        .shot-5 {
+            background: #1a4d1a;
+            color: #4f8;
+            border-color: #4f8;
+        }
+        .shot-4 {
+            background: #1a3d4d;
+            color: #4af;
+            border-color: #4af;
+        }
+        .shot-3 {
+            background: #4d3d1a;
+            color: #fa4;
+            border-color: #fa4;
+        }
+        .shot-2 {
+            background: #4d2d1a;
+            color: #f84;
+            border-color: #f84;
+        }
+        .shot-1 {
+            background: #3d1a1a;
+            color: #f66;
+            border-color: #f66;
+        }
+        .shot-0 {
+            background: #1a1a1a;
+            color: #666;
+            border-color: #666;
+        }
+        .total-score {
+            font-size: 32px;
+            font-weight: 700;
+            color: #c5a000;
+            text-shadow: 0 0 8px rgba(197, 160, 0, 0.6);
+        }
+        .offline-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: #f44;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .camera-lane.offline .offline-overlay {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Multi-Camera Spectator Mode</h1>
+        <div class="layout-controls">
+            <button class="btn" onclick="setLayout(1)">Single</button>
+            <button class="btn active" onclick="setLayout(2)">2x2</button>
+            <button class="btn" onclick="setLayout(3)">3 Cam</button>
+            <button class="btn" onclick="setLayout(4)">4 Cam</button>
+            <button class="btn" onclick="toggleFullscreen()">Fullscreen</button>
+        </div>
+    </div>
+
+    <div class="grid-container grid-4" id="gridContainer">
+        <!-- Camera lanes will be dynamically generated -->
+    </div>
+
+    <script>
+        const cameras = {{ cameras | tojson }};
+        let currentLayout = cameras.length;
+        let hitsData = {};
+
+        function initCameras() {
+            const container = document.getElementById('gridContainer');
+            container.innerHTML = '';
+
+            cameras.forEach((camId, index) => {
+                const lane = document.createElement('div');
+                lane.className = 'camera-lane';
+                lane.id = `lane-${camId}`;
+                
+                lane.innerHTML = `
+                    <div class="lane-header">
+                        <div class="lane-title">Lane ${index + 1} (Camera ${camId})</div>
+                        <div class="lane-status status-active" id="status-${camId}">ACTIVE</div>
+                    </div>
+                    <div class="video-container">
+                        <img class="video-feed" src="/video/${camId}" alt="Camera ${camId}">
+                        <div class="offline-overlay">CAMERA OFFLINE</div>
+                        <div class="loading">Loading camera feed...</div>
+                    </div>
+                    <div class="score-display">
+                        <div class="shots-container" id="shots-${camId}">
+                            <!-- Shots will appear here -->
+                        </div>
+                        <div class="total-score" id="total-${camId}">0/30</div>
+                    </div>
+                `;
+                
+                container.appendChild(lane);
+
+                // Monitor video feed
+                const img = lane.querySelector('.video-feed');
+                const loading = lane.querySelector('.loading');
+                
+                img.onload = function() {
+                    loading.style.display = 'none';
+                };
+                
+                img.onerror = function() {
+                    lane.classList.add('offline');
+                    document.getElementById(`status-${camId}`).className = 'lane-status status-inactive';
+                    document.getElementById(`status-${camId}`).textContent = 'OFFLINE';
+                };
+            });
+
+            setLayout(currentLayout);
+        }
+
+        function setLayout(count) {
+            currentLayout = count;
+            const container = document.getElementById('gridContainer');
+            
+            // Remove all layout classes
+            container.classList.remove('grid-1', 'grid-2', 'grid-3', 'grid-4');
+            
+            // Add new layout class
+            container.classList.add(`grid-${count}`);
+            
+            // Update active button
+            document.querySelectorAll('.layout-controls .btn').forEach((btn, idx) => {
+                btn.classList.toggle('active', idx + 1 === count);
+            });
+        }
+
+        function updateScores() {
+            cameras.forEach(camId => {
+                fetch(`/hits/${camId}`)
+                    .then(r => r.json())
+                    .then(hits => {
+                        if (!hits || hits.length === 0) return;
+                        
+                        hitsData[camId] = hits;
+                        displayShots(camId, hits);
+                    })
+                    .catch(err => {
+                        console.error(`Error fetching hits for camera ${camId}:`, err);
+                    });
+            });
+        }
+
+        function displayShots(camId, hits) {
+            const shotsContainer = document.getElementById(`shots-${camId}`);
+            const totalDisplay = document.getElementById(`total-${camId}`);
+            
+            if (!shotsContainer || !totalDisplay) return;
+
+            // Clear existing shots
+            shotsContainer.innerHTML = '';
+
+            // Calculate total
+            const total = hits.reduce((sum, hit) => sum + hit.score, 0);
+            const maxScore = hits.length * 5;
+
+            // Display individual shots
+            hits.forEach(hit => {
+                const badge = document.createElement('div');
+                badge.className = `shot-badge shot-${Math.floor(hit.score)}`;
+                badge.textContent = hit.score;
+                shotsContainer.appendChild(badge);
+            });
+
+            // Update total
+            totalDisplay.textContent = `${total}/${maxScore}`;
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Initialize
+        initCameras();
+
+        // Poll for score updates every 2 seconds
+        setInterval(updateScores, 2000);
+
+        // Initial score load
+        setTimeout(updateScores, 500);
+
+        // Handle keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            switch(e.key) {
+                case '1':
+                    setLayout(1);
+                    break;
+                case '2':
+                    setLayout(2);
+                    break;
+                case '3':
+                    setLayout(3);
+                    break;
+                case '4':
+                    setLayout(4);
+                    break;
+                case 'f':
+                case 'F':
+                    toggleFullscreen();
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

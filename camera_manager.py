@@ -1,12 +1,16 @@
 import cv2
 import numpy as np
 import time
-from detection import process_frame
-from homography import warp
+import json
+
+# Load config
+cfg = json.load(open("config.json"))
 
 caps = {}
 exposure_locked = {}
-zoom_levels = {}  # Track zoom level per camera
+zoom_levels = {}
+rotation_angles = {}  # Rotation per camera
+white_balance_locked = {}
 
 def init_cameras(camera_ids=[0]):
     """
@@ -15,7 +19,7 @@ def init_cameras(camera_ids=[0]):
     Args:
         camera_ids: list of camera IDs (default [0])
     """
-    global caps, exposure_locked, zoom_levels
+    global caps, exposure_locked, zoom_levels, rotation_angles, white_balance_locked
 
     for cam_id in camera_ids:
         cap = cv2.VideoCapture(cam_id, cv2.CAP_V4L2)
@@ -32,7 +36,9 @@ def init_cameras(camera_ids=[0]):
 
         caps[cam_id] = cap
         exposure_locked[cam_id] = False
-        zoom_levels[cam_id] = 1.0  # Default zoom
+        zoom_levels[cam_id] = 1.0
+        rotation_angles[cam_id] = 0  # Default: no rotation
+        white_balance_locked[cam_id] = False
         
         print(f"✅ Initialized camera {cam_id}")
 
@@ -80,9 +86,6 @@ def lock_exposure(cam_id=0, stabilization_frames=30):
     if current_exposure != 0:
         cap.set(cv2.CAP_PROP_EXPOSURE, current_exposure)
     
-    # Lock auto white balance too
-    cap.set(cv2.CAP_PROP_AUTO_WB, 0)  # Disable auto white balance
-    
     exposure_locked[cam_id] = True
     
     actual_exposure = cap.get(cv2.CAP_PROP_EXPOSURE)
@@ -103,10 +106,76 @@ def unlock_exposure(cam_id=0):
         return
     
     cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 3)  # Auto mode
-    cap.set(cv2.CAP_PROP_AUTO_WB, 1)  # Enable auto white balance
     
     exposure_locked[cam_id] = False
     print(f"🔓 Exposure unlocked for camera {cam_id}")
+
+
+def lock_white_balance(cam_id=0):
+    """
+    Lock white balance to prevent auto-adjustment.
+    
+    Args:
+        cam_id: Camera ID
+    
+    Returns:
+        True if successful
+    """
+    cap = caps.get(cam_id)
+    if cap is None:
+        return False
+    
+    # Disable auto white balance
+    cap.set(cv2.CAP_PROP_AUTO_WB, 0)
+    white_balance_locked[cam_id] = True
+    
+    print(f"🎨 White balance locked for camera {cam_id}")
+    return True
+
+
+def unlock_white_balance(cam_id=0):
+    """
+    Unlock white balance to allow auto-adjustment.
+    
+    Args:
+        cam_id: Camera ID
+    """
+    cap = caps.get(cam_id)
+    if cap is None:
+        return
+    
+    # Enable auto white balance
+    cap.set(cv2.CAP_PROP_AUTO_WB, 1)
+    white_balance_locked[cam_id] = False
+    
+    print(f"🎨 White balance unlocked for camera {cam_id}")
+
+
+def set_white_balance(cam_id=0, temperature=4000):
+    """
+    Set white balance temperature manually.
+    
+    Args:
+        cam_id: Camera ID
+        temperature: Color temperature in Kelvin (2800-6500)
+    
+    Returns:
+        Actual temperature set
+    """
+    cap = caps.get(cam_id)
+    if cap is None:
+        return None
+    
+    # First lock auto WB
+    cap.set(cv2.CAP_PROP_AUTO_WB, 0)
+    
+    # Set temperature (if supported by camera)
+    cap.set(cv2.CAP_PROP_WB_TEMPERATURE, temperature)
+    
+    actual = cap.get(cv2.CAP_PROP_WB_TEMPERATURE)
+    print(f"🎨 Camera {cam_id} white balance: {actual}K")
+    
+    return actual
 
 
 def is_exposure_locked(cam_id=0):
@@ -119,7 +188,6 @@ def set_zoom(cam_id=0, zoom_level=1.0):
     Set digital zoom level for camera.
     
     Digital zoom crops and scales the image to focus on target area.
-    Useful for narrowing down where the target is.
     
     Args:
         cam_id: Camera ID
@@ -128,9 +196,6 @@ def set_zoom(cam_id=0, zoom_level=1.0):
     Returns:
         Actual zoom level set
     """
-    import json
-    cfg = json.load(open("config.json"))
-    
     min_zoom = cfg.get("min_zoom", 1.0)
     max_zoom = cfg.get("max_zoom", 4.0)
     
@@ -163,6 +228,69 @@ def adjust_zoom(cam_id=0, delta=0.1):
 def get_zoom(cam_id=0):
     """Get current zoom level for camera."""
     return zoom_levels.get(cam_id, 1.0)
+
+
+def set_rotation(cam_id=0, angle=0):
+    """
+    Set rotation angle for camera image.
+    
+    Useful for correcting camera mounting angles.
+    
+    Args:
+        cam_id: Camera ID
+        angle: Rotation angle in degrees (0, 90, 180, 270, or any value)
+    
+    Returns:
+        Actual angle set
+    """
+    # Normalize angle to 0-359
+    angle = angle % 360
+    
+    rotation_angles[cam_id] = angle
+    
+    print(f"🔄 Camera {cam_id} rotation set to {angle}°")
+    return angle
+
+
+def get_rotation(cam_id=0):
+    """Get current rotation angle for camera."""
+    return rotation_angles.get(cam_id, 0)
+
+
+def apply_rotation(frame, angle):
+    """
+    Apply rotation to frame.
+    
+    Args:
+        frame: Input frame
+        angle: Rotation angle in degrees
+    
+    Returns:
+        Rotated frame
+    """
+    if angle == 0:
+        return frame
+    
+    h, w = frame.shape[:2]
+    center = (w // 2, h // 2)
+    
+    # Get rotation matrix
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    
+    # Calculate new dimensions if needed for 90/270 rotations
+    if angle == 90 or angle == 270:
+        # Swap width and height
+        new_w, new_h = h, w
+    else:
+        new_w, new_h = w, h
+    
+    # Apply rotation
+    rotated = cv2.warpAffine(frame, M, (new_w, new_h), 
+                             flags=cv2.INTER_LINEAR,
+                             borderMode=cv2.BORDER_CONSTANT,
+                             borderValue=(0, 0, 0))
+    
+    return rotated
 
 
 def apply_digital_zoom(frame, zoom_level=1.0):
@@ -232,9 +360,34 @@ def optimize_camera_settings(cam_id=0):
     print(f"✅ Camera {cam_id} optimized")
 
 
+def process_frame(frame, cam_id):
+    """
+    Apply all transformations to a frame (zoom, rotation).
+    
+    Args:
+        frame: Input frame
+        cam_id: Camera ID
+    
+    Returns:
+        Processed frame
+    """
+    # Apply rotation first
+    angle = rotation_angles.get(cam_id, 0)
+    if angle != 0:
+        frame = apply_rotation(frame, angle)
+    
+    # Then apply zoom
+    zoom = zoom_levels.get(cam_id, 1.0)
+    if zoom > 1.0:
+        frame = apply_digital_zoom(frame, zoom)
+    
+    return frame
+
+
 def get_frame(cam_id=0):
     """
     Capture and process a frame from the specified camera.
+    For detection with overlays.
     
     Args:
         cam_id: Camera ID to capture from
@@ -250,27 +403,30 @@ def get_frame(cam_id=0):
     if not ret:
         return None
 
-    # Apply digital zoom if set
-    zoom = zoom_levels.get(cam_id, 1.0)
-    if zoom > 1.0:
-        frame = apply_digital_zoom(frame, zoom)
+    # Apply transformations
+    frame = process_frame(frame, cam_id)
     
-    # Apply perspective warp if configured
+    # Import here to avoid circular dependency
+    from detection import process_frame as detect_frame
+    from homography import warp
+    
+    # Apply homography if configured
     frame = warp(frame)
     
     # Process for detection
-    return process_frame(frame, cam_id)
+    return detect_frame(frame, cam_id)
 
 
 def get_raw_frame(cam_id=0):
     """
-    Get raw frame without processing (for calibration, etc.).
+    Get raw frame with transformations but without detection processing.
+    For calibration, preview, etc.
     
     Args:
         cam_id: Camera ID
     
     Returns:
-        Raw frame with zoom applied
+        Raw frame with zoom/rotation applied
     """
     cap = caps.get(cam_id)
     if cap is None:
@@ -280,10 +436,8 @@ def get_raw_frame(cam_id=0):
     if not ret:
         return None
 
-    # Apply digital zoom if set
-    zoom = zoom_levels.get(cam_id, 1.0)
-    if zoom > 1.0:
-        frame = apply_digital_zoom(frame, zoom)
+    # Apply transformations only (no detection)
+    frame = process_frame(frame, cam_id)
     
     return frame
 
@@ -311,7 +465,11 @@ def get_camera_info(cam_id=0):
         "brightness": int(cap.get(cv2.CAP_PROP_BRIGHTNESS)),
         "contrast": int(cap.get(cv2.CAP_PROP_CONTRAST)),
         "exposure_locked": exposure_locked.get(cam_id, False),
-        "zoom": zoom_levels.get(cam_id, 1.0)
+        "zoom": zoom_levels.get(cam_id, 1.0),
+        "rotation": rotation_angles.get(cam_id, 0),
+        "white_balance": int(cap.get(cv2.CAP_PROP_WB_TEMPERATURE)),
+        "white_balance_locked": white_balance_locked.get(cam_id, False),
+        "auto_wb": int(cap.get(cv2.CAP_PROP_AUTO_WB))
     }
 
 
@@ -323,4 +481,6 @@ def release_cameras():
     caps.clear()
     exposure_locked.clear()
     zoom_levels.clear()
+    rotation_angles.clear()
+    white_balance_locked.clear()
     print("📷 All cameras released")

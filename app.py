@@ -2,7 +2,9 @@ from flask import Flask, render_template, Response, request, jsonify, send_file
 from camera_manager import (
     init_cameras, get_frame, get_raw_frame, lock_exposure, unlock_exposure, 
     is_exposure_locked, optimize_camera_settings, get_camera_info,
-    set_zoom, adjust_zoom, get_zoom
+    set_zoom, adjust_zoom, get_zoom,
+    set_rotation, get_rotation,
+    lock_white_balance, unlock_white_balance, set_white_balance
 )
 from calibration import set_calibration, get_calibration_quality
 from detection import toggle_detection, get_hits, reset_hits, get_round_summary
@@ -51,10 +53,24 @@ def index():
 
 @app.route("/video/<int:cam>")
 def video(cam):
-    """Stream video from specified camera."""
+    """Stream video from specified camera with detection overlay."""
     def gen():
         while True:
             frame = get_frame(cam)
+            if frame is None:
+                continue
+            _, buffer = cv2.imencode(".jpg", frame)
+            yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" +
+                   buffer.tobytes() + b"\r\n")
+    return Response(gen(), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+
+@app.route("/raw_video/<int:cam>")
+def raw_video(cam):
+    """Stream raw video (no detection overlay) from specified camera."""
+    def gen():
+        while True:
+            frame = get_raw_frame(cam)
             if frame is None:
                 continue
             _, buffer = cv2.imencode(".jpg", frame)
@@ -75,6 +91,14 @@ def hits():
     return jsonify(get_hits())
 
 
+@app.route("/hits/<int:cam>")
+def hits_for_camera(cam):
+    """Get hits for specific camera/lane."""
+    all_hits = get_hits()
+    # Filter by camera if tracking camera_id in hit data
+    return jsonify(all_hits)
+
+
 @app.route("/round_summary")
 def round_summary():
     """Get current round summary with statistics."""
@@ -83,8 +107,16 @@ def round_summary():
 
 @app.route("/spectator")
 def spectator():
-    """Spectator view page."""
-    return render_template("spectator.html")
+    """Multi-camera spectator view page."""
+    cameras = cfg.get("cameras", [0])
+    return render_template("spectator.html", cameras=cameras)
+
+
+@app.route("/spectator_fullscreen")
+def spectator_fullscreen():
+    """Full-screen multi-camera spectator mode."""
+    cameras = cfg.get("cameras", [0])
+    return render_template("spectator_fullscreen.html", cameras=cameras)
 
 
 @app.route("/reset")
@@ -121,7 +153,43 @@ def set_cal():
 @app.route("/calibrate")
 def calibrate():
     """Calibration page."""
-    return render_template("calibrate.html")
+    cameras = cfg.get("cameras", [0])
+    return render_template("calibrate.html", cameras=cameras)
+
+
+@app.route("/calibrate/<int:cam>")
+def calibrate_camera(cam):
+    """Calibration page for specific camera."""
+    return render_template("calibrate.html", cameras=[cam], selected_camera=cam)
+
+
+# ========== Camera Info & URLs ==========
+
+@app.route("/camera_urls")
+def camera_urls():
+    """
+    Get camera stream URLs for all configured cameras.
+    Used by external scoring systems.
+    """
+    base_url = request.host_url.rstrip('/')
+    cameras = cfg.get("cameras", [0])
+    
+    urls = []
+    for cam_id in cameras:
+        urls.append({
+            "camera_id": cam_id,
+            "lane": cam_id + 1,
+            "stream_url": f"{base_url}/video/{cam_id}",
+            "raw_stream_url": f"{base_url}/raw_video/{cam_id}",
+            "hits_url": f"{base_url}/hits/{cam_id}",
+            "status_url": f"{base_url}/camera_info/{cam_id}"
+        })
+    
+    return jsonify({
+        "base_url": base_url,
+        "cameras": urls,
+        "total_cameras": len(urls)
+    })
 
 
 # ========== Camera Control Endpoints ==========
@@ -138,6 +206,27 @@ def unlock_exp(cam):
     """Unlock camera exposure (re-enable auto)."""
     unlock_exposure(cam)
     return {"locked": False, "camera": cam}
+
+
+@app.route("/lock_white_balance/<int:cam>")
+def lock_wb(cam):
+    """Lock white balance."""
+    success = lock_white_balance(cam)
+    return {"locked": success, "camera": cam}
+
+
+@app.route("/unlock_white_balance/<int:cam>")
+def unlock_wb(cam):
+    """Unlock white balance (re-enable auto)."""
+    unlock_white_balance(cam)
+    return {"locked": False, "camera": cam}
+
+
+@app.route("/set_white_balance/<int:cam>/<int:temperature>")
+def set_wb_temp(cam, temperature):
+    """Set white balance temperature (2800-6500K)."""
+    actual = set_white_balance(cam, temperature)
+    return {"camera": cam, "temperature": actual}
 
 
 @app.route("/camera_info/<int:cam>")
@@ -173,6 +262,20 @@ def get_camera_zoom(cam):
     """Get current camera zoom level."""
     zoom = get_zoom(cam)
     return {"camera": cam, "zoom": zoom}
+
+
+@app.route("/set_rotation/<int:cam>/<int:angle>")
+def set_camera_rotation(cam, angle):
+    """Set camera rotation angle (0, 90, 180, 270, or any value)."""
+    actual_angle = set_rotation(cam, angle)
+    return {"camera": cam, "rotation": actual_angle}
+
+
+@app.route("/get_rotation/<int:cam>")
+def get_camera_rotation(cam):
+    """Get current camera rotation angle."""
+    angle = get_rotation(cam)
+    return {"camera": cam, "rotation": angle}
 
 
 # ========== Scoring Configuration Endpoints ==========
@@ -220,9 +323,7 @@ def get_shot(shot_num):
     if image is None:
         return {"error": "Shot not found"}, 404
     
-    # Encode image as JPEG
     _, buffer = cv2.imencode(".jpg", image)
-    
     return Response(buffer.tobytes(), mimetype="image/jpeg")
 
 
@@ -299,7 +400,6 @@ def load_round_endpoint(round_dir):
     if not shots:
         return {"error": "Round not found or empty"}, 404
     
-    # Return metadata only (images accessed via get_shot_image)
     metadata_list = [meta for _, meta in shots]
     return jsonify({"round": round_dir, "shots": metadata_list})
 
@@ -318,12 +418,13 @@ def enable_recording_endpoint(enabled):
     return {"recording": enabled == 1}
 
 
-# ========== Settings Page ==========
+# ========== Settings & Scoring Pages ==========
 
 @app.route("/settings")
 def settings():
     """Settings configuration page."""
-    return render_template("settings.html")
+    cameras = cfg.get("cameras", [0])
+    return render_template("settings.html", cameras=cameras)
 
 
 @app.route("/rounds")
@@ -332,5 +433,11 @@ def rounds():
     return render_template("rounds.html")
 
 
+@app.route("/scoring")
+def scoring():
+    """Full scoring interface (external HTML)."""
+    return render_template("scoring.html")
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=True)

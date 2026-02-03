@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Air Target Settings</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        h2 { color: #666; margin-top: 0; }
+        .control-group { margin: 15px 0; }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .checkbox-label {
+            display: inline;
+            font-weight: normal;
+            margin-left: 5px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover { background: #45a049; }
+        button.secondary { background: #2196F3; }
+        button.secondary:hover { background: #0b7dda; }
+        button.danger { background: #f44336; }
+        button.danger:hover { background: #da190b; }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .display {
+            font-size: 18px;
+            font-weight: bold;
+            min-width: 80px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        input[type="range"] { width: 300px; }
+        select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #2196F3;
+            text-decoration: none;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .camera-selector {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link">← Back to Main</a>
+    
+    <h1>🎯 Air Target Settings</h1>
+
+    <!-- Camera Selection -->
+    <div class="camera-selector">
+        <label>Select Camera:</label>
+        <select id="cameraSelect" onchange="changeCamera()">
+            {% for cam in cameras %}
+            <option value="{{ cam }}">Camera {{ cam }} (Lane {{ cam + 1 }})</option>
+            {% endfor %}
+        </select>
+        <span id="cameraStatus"></span>
+    </div>
+
+    <!-- Scoring Configuration -->
+    <div class="section">
+        <h2>Scoring Configuration</h2>
+        
+        <div class="control-group">
+            <input type="checkbox" id="use4Ring" checked>
+            <label class="checkbox-label" for="use4Ring">
+                Use 4-Ring Scoring (5" outer ring = 1 point)
+            </label>
+            <p style="margin: 5px 0 0 25px; color: #666; font-size: 14px;">
+                When unchecked: 3-ring scoring (4" ring = 2 points, outside = 0)
+            </p>
+        </div>
+
+        <div class="control-group">
+            <input type="checkbox" id="bullHoleBonus">
+            <label class="checkbox-label" for="bullHoleBonus">
+                Enable Bull Hole Bonus (5.1 points)
+            </label>
+            <p style="margin: 5px 0 0 25px; color: #666; font-size: 14px;">
+                Awards 5.1 points for pellet through bull hole without visible mark
+            </p>
+        </div>
+
+        <button onclick="saveScoringConfig()">Save Scoring Settings</button>
+        <div id="scoringStatus"></div>
+    </div>
+
+    <!-- Camera Zoom -->
+    <div class="section">
+        <h2>Camera Zoom</h2>
+        
+        <div class="control-group">
+            <label>Digital Zoom Level</label>
+            <div class="controls">
+                <button onclick="zoomOut()">−</button>
+                <span class="display" id="zoomDisplay">1.0x</span>
+                <button onclick="zoomIn()">+</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Zoom Slider</label>
+            <input type="range" id="zoomSlider" min="1.0" max="4.0" step="0.1" value="1.0" 
+                   oninput="setZoomFromSlider(this.value)">
+        </div>
+
+        <button onclick="resetZoom()">Reset Zoom (1.0x)</button>
+        <div id="zoomStatus"></div>
+    </div>
+
+    <!-- Camera Rotation -->
+    <div class="section">
+        <h2>Camera Rotation</h2>
+        
+        <div class="control-group">
+            <label>Rotation Angle</label>
+            <div class="controls">
+                <button onclick="rotateCamera(0)">0°</button>
+                <button onclick="rotateCamera(90)">90°</button>
+                <button onclick="rotateCamera(180)">180°</button>
+                <button onclick="rotateCamera(270)">270°</button>
+                <span class="display" id="rotationDisplay">0°</span>
+            </div>
+            <p style="color: #666; font-size: 14px; margin-top: 10px;">
+                Correct for camera mounting angle. Common values: 0° (normal), 90° (portrait), 180° (upside down), 270° (portrait reversed)
+            </p>
+        </div>
+
+        <div class="control-group">
+            <label>Custom Angle (0-359°)</label>
+            <div class="controls">
+                <input type="number" id="customAngle" min="0" max="359" value="0" style="width: 100px; padding: 8px;">
+                <button onclick="setCustomRotation()">Set Custom</button>
+            </div>
+        </div>
+
+        <div id="rotationStatus"></div>
+    </div>
+
+    <!-- White Balance -->
+    <div class="section">
+        <h2>White Balance</h2>
+        
+        <div class="control-group">
+            <label>Mode</label>
+            <div class="controls">
+                <button id="wbAutoBtn" onclick="setWBMode('auto')">Auto</button>
+                <button id="wbManualBtn" onclick="setWBMode('manual')">Manual</button>
+                <span id="wbModeDisplay">Auto</span>
+            </div>
+        </div>
+
+        <div class="control-group" id="wbTemperatureControl" style="display: none;">
+            <label>Color Temperature</label>
+            <div class="controls">
+                <button onclick="setWBPreset(2800)">Tungsten (2800K)</button>
+                <button onclick="setWBPreset(4000)">Fluorescent (4000K)</button>
+                <button onclick="setWBPreset(5500)">Daylight (5500K)</button>
+                <button onclick="setWBPreset(6500)">Cloudy (6500K)</button>
+            </div>
+            <p style="color: #666; font-size: 14px; margin-top: 10px;">
+                Current: <span id="wbTemp">Auto</span>
+            </p>
+        </div>
+
+        <div id="wbStatus"></div>
+    </div>
+
+    <!-- Camera Exposure -->
+    <div class="section">
+        <h2>Camera Exposure</h2>
+        
+        <div class="control-group">
+            <label>Exposure Control</label>
+            <button id="exposureLockBtn" onclick="toggleExposureLock()">Lock Exposure</button>
+            <p style="color: #666; font-size: 14px; margin-top: 10px;">
+                ⚠️ Lock exposure before shooting to prevent auto-adjustment during rounds.
+            </p>
+        </div>
+
+        <div class="control-group">
+            <button class="secondary" onclick="optimizeCamera()">Optimize Camera Settings</button>
+            <p style="color: #666; font-size: 14px; margin-top: 10px;">
+                Adjusts brightness, contrast, and focus for optimal detection.
+            </p>
+        </div>
+
+        <button onclick="getCameraInfo()">View Camera Info</button>
+        <div id="cameraInfoStatus"></div>
+    </div>
+
+    <!-- Shot Recording -->
+    <div class="section">
+        <h2>Shot Recording</h2>
+        
+        <div class="control-group">
+            <input type="checkbox" id="recordingEnabled" checked>
+            <label class="checkbox-label" for="recordingEnabled">
+                Enable Shot Recording
+            </label>
+            <p style="margin: 5px 0 0 25px; color: #666; font-size: 14px;">
+                Saves images of each shot for review and stacking
+            </p>
+        </div>
+
+        <button onclick="saveRecordingConfig()">Save Recording Settings</button>
+        <button class="secondary" onclick="viewRecordedRounds()">View Recorded Rounds</button>
+        <div id="recordingStatus"></div>
+    </div>
+
+    <script>
+        let currentCamera = {{ cameras[0] }};
+        let currentZoom = 1.0;
+        let currentRotation = 0;
+        let exposureLocked = false;
+        let wbMode = 'auto';
+
+        window.onload = function() {
+            changeCamera();
+            loadScoringConfig();
+        };
+
+        // ========== Camera Selection ==========
+        
+        function changeCamera() {
+            currentCamera = parseInt(document.getElementById('cameraSelect').value);
+            loadCameraSettings();
+        }
+
+        async function loadCameraSettings() {
+            try {
+                const response = await fetch(`/camera_info/${currentCamera}`);
+                const data = await response.json();
+                
+                currentZoom = data.zoom || 1.0;
+                currentRotation = data.rotation || 0;
+                exposureLocked = data.exposure_locked || false;
+                
+                updateZoomDisplay();
+                updateRotationDisplay();
+                updateExposureButton();
+                
+                document.getElementById('cameraStatus').textContent = '✓';
+                document.getElementById('cameraStatus').style.color = 'green';
+            } catch (err) {
+                console.error('Failed to load camera settings:', err);
+                document.getElementById('cameraStatus').textContent = '✗';
+                document.getElementById('cameraStatus').style.color = 'red';
+            }
+        }
+
+        // ========== Scoring Configuration ==========
+        
+        function loadScoringConfig() {
+            fetch('/get_scoring_config')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('use4Ring').checked = data.use_4_ring;
+                    document.getElementById('bullHoleBonus').checked = data.enable_bull_hole_bonus;
+                });
+        }
+
+        function saveScoringConfig() {
+            const config = {
+                use_4_ring: document.getElementById('use4Ring').checked,
+                enable_bull_hole_bonus: document.getElementById('bullHoleBonus').checked
+            };
+
+            fetch('/set_scoring_config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(config)
+            })
+            .then(r => r.json())
+            .then(data => {
+                showStatus('scoringStatus', `✓ Settings saved: ${data.use_4_ring ? '4-ring' : '3-ring'} scoring`, 'success');
+            });
+        }
+
+        // ========== Zoom Controls ==========
+        
+        function updateZoomDisplay() {
+            document.getElementById('zoomDisplay').textContent = currentZoom.toFixed(1) + 'x';
+            document.getElementById('zoomSlider').value = currentZoom;
+        }
+
+        function zoomIn() {
+            fetch(`/adjust_zoom/${currentCamera}/0.1`)
+                .then(r => r.json())
+                .then(data => {
+                    currentZoom = data.zoom;
+                    updateZoomDisplay();
+                    showStatus('zoomStatus', `Zoom: ${currentZoom.toFixed(1)}x`, 'info');
+                });
+        }
+
+        function zoomOut() {
+            fetch(`/adjust_zoom/${currentCamera}/-0.1`)
+                .then(r => r.json())
+                .then(data => {
+                    currentZoom = data.zoom;
+                    updateZoomDisplay();
+                    showStatus('zoomStatus', `Zoom: ${currentZoom.toFixed(1)}x`, 'info');
+                });
+        }
+
+        function setZoomFromSlider(value) {
+            fetch(`/set_zoom/${currentCamera}/${value}`)
+                .then(r => r.json())
+                .then(data => {
+                    currentZoom = data.zoom;
+                    updateZoomDisplay();
+                    showStatus('zoomStatus', `Zoom: ${currentZoom.toFixed(1)}x`, 'info');
+                });
+        }
+
+        function resetZoom() {
+            fetch(`/set_zoom/${currentCamera}/1.0`)
+                .then(r => r.json())
+                .then(data => {
+                    currentZoom = data.zoom;
+                    updateZoomDisplay();
+                    showStatus('zoomStatus', 'Zoom reset to 1.0x', 'success');
+                });
+        }
+
+        // ========== Rotation Controls ==========
+        
+        function updateRotationDisplay() {
+            document.getElementById('rotationDisplay').textContent = currentRotation + '°';
+            document.getElementById('customAngle').value = currentRotation;
+        }
+
+        function rotateCamera(angle) {
+            fetch(`/set_rotation/${currentCamera}/${angle}`)
+                .then(r => r.json())
+                .then(data => {
+                    currentRotation = data.rotation;
+                    updateRotationDisplay();
+                    showStatus('rotationStatus', `Rotation: ${currentRotation}°`, 'success');
+                });
+        }
+
+        function setCustomRotation() {
+            const angle = parseInt(document.getElementById('customAngle').value);
+            rotateCamera(angle);
+        }
+
+        // ========== White Balance Controls ==========
+        
+        function setWBMode(mode) {
+            wbMode = mode;
+            
+            if (mode === 'auto') {
+                fetch(`/unlock_white_balance/${currentCamera}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('wbModeDisplay').textContent = 'Auto';
+                        document.getElementById('wbTemperatureControl').style.display = 'none';
+                        document.getElementById('wbAutoBtn').style.background = '#4CAF50';
+                        document.getElementById('wbManualBtn').style.background = '#2196F3';
+                        showStatus('wbStatus', 'White balance: Auto', 'info');
+                    });
+            } else {
+                fetch(`/lock_white_balance/${currentCamera}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('wbModeDisplay').textContent = 'Manual';
+                        document.getElementById('wbTemperatureControl').style.display = 'block';
+                        document.getElementById('wbAutoBtn').style.background = '#2196F3';
+                        document.getElementById('wbManualBtn').style.background = '#4CAF50';
+                        showStatus('wbStatus', 'White balance: Manual', 'info');
+                    });
+            }
+        }
+
+        function setWBPreset(temperature) {
+            fetch(`/set_white_balance/${currentCamera}/${temperature}`)
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('wbTemp').textContent = `${data.temperature}K`;
+                    showStatus('wbStatus', `White balance: ${data.temperature}K`, 'success');
+                });
+        }
+
+        // ========== Exposure Controls ==========
+        
+        function toggleExposureLock() {
+            const endpoint = exposureLocked ? '/unlock_exposure/' : '/lock_exposure/';
+            
+            fetch(endpoint + currentCamera)
+                .then(r => r.json())
+                .then(data => {
+                    exposureLocked = data.locked;
+                    updateExposureButton();
+                    showStatus('cameraInfoStatus', exposureLocked ? 'Exposure locked ✓' : 'Exposure unlocked', 'success');
+                });
+        }
+
+        function updateExposureButton() {
+            const btn = document.getElementById('exposureLockBtn');
+            btn.textContent = exposureLocked ? 'Unlock Exposure' : 'Lock Exposure';
+            btn.className = exposureLocked ? 'danger' : '';
+        }
+
+        function optimizeCamera() {
+            fetch(`/optimize_camera/${currentCamera}`)
+                .then(r => r.json())
+                .then(data => {
+                    showStatus('cameraInfoStatus', 'Camera optimized ✓', 'success');
+                });
+        }
+
+        function getCameraInfo() {
+            fetch(`/camera_info/${currentCamera}`)
+                .then(r => r.json())
+                .then(data => {
+                    const status = document.getElementById('cameraInfoStatus');
+                    status.className = 'status info';
+                    status.innerHTML = `
+                        <strong>Camera ${currentCamera} Information:</strong><br>
+                        Resolution: ${data.width}x${data.height}<br>
+                        FPS: ${data.fps}<br>
+                        Exposure: ${data.exposure} (${data.exposure_locked ? 'Locked' : 'Auto'})<br>
+                        Brightness: ${data.brightness}<br>
+                        Contrast: ${data.contrast}<br>
+                        Zoom: ${data.zoom.toFixed(1)}x<br>
+                        Rotation: ${data.rotation}°<br>
+                        White Balance: ${data.white_balance}K (${data.white_balance_locked ? 'Locked' : 'Auto'})
+                    `;
+                });
+        }
+
+        // ========== Recording ==========
+        
+        function saveRecordingConfig() {
+            const enabled = document.getElementById('recordingEnabled').checked ? 1 : 0;
+            
+            fetch(`/enable_recording/${enabled}`)
+                .then(r => r.json())
+                .then(data => {
+                    showStatus('recordingStatus', `✓ Recording ${data.recording ? 'enabled' : 'disabled'}`, 'success');
+                });
+        }
+
+        function viewRecordedRounds() {
+            window.location.href = '/rounds';
+        }
+
+        // ========== Utilities ==========
+        
+        function showStatus(elementId, message, type) {
+            const el = document.getElementById(elementId);
+            el.className = 'status ' + type;
+            el.textContent = message;
+            setTimeout(() => { el.textContent = ''; }, 5000);
+        }
+    </script>
+</body>
+</html>
