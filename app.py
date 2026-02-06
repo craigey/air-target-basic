@@ -440,4 +440,21 @@ def scoring():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Initialize break-beam GPIO if available
+    try:
+        from breakbeam import setup_gpio, watch_breakbeam
+        import threading
+        
+        setup_gpio()
+        threading.Thread(target=watch_breakbeam, daemon=True).start()
+    except Exception as e:
+        print(f"⚠️ Break-beam not available: {e}")
+    
+    # Run Flask server
+    # IMPORTANT: use_reloader=False prevents camera re-initialization errors
+    app.run(
+        host="0.0.0.0", 
+        port=5000, 
+        debug=True,
+        use_reloader=False  # CRITICAL: Prevents camera access conflicts
+    )
