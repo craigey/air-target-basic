@@ -1,0 +1,56 @@
+{
+  "cameras": [0],
+  
+  "_comment_target": "NARPA Official Target Dimensions (4-ring default)",
+  "bull_hole_mm": 9.525,
+  "bull_mm": 25.4,
+  "rings_mm": [50.8, 76.2, 101.6, 127.0],
+  "pellet_mm": 4.5,
+  
+  "_comment_scoring": "NARPA Scoring Rules - Configurable via UI",
+  "use_4_ring_scoring": true,
+  "enable_bull_hole_bonus": false,
+  "bull_hole_score": 5.1,
+  "shots_per_round": 6,
+  
+  "_comment_detection": "Detection algorithm settings",
+  "threshold": 18,
+  "min_area": 40,
+  "max_area": 400,
+  "adaptive_threshold": true,
+  "color_detection": true,
+  "grey_threshold": 15,
+  "min_confidence": 0.6,
+  "min_circularity": 0.5,
+  
+  "_comment_baseline": "Baseline update strategy",
+  "baseline_update_mode": "selective",
+  
+  "_comment_timing": "Shot detection timing (0.3s minimum = 9 frames @ 30fps)",
+  "shot_cooldown_frames": 9,
+  "max_shot_interval_seconds": 180,
+  
+  "_comment_camera": "Camera optimization settings",
+  "auto_lock_exposure": true,
+  "exposure_stabilization_frames": 30,
+  "optimize_camera_on_start": true,
+  "default_zoom": 1.0,
+  "zoom_step": 0.1,
+  "min_zoom": 1.0,
+  "max_zoom": 5.0,
+  "default_rotation": 0,
+  "default_white_balance": 4000,
+  
+  "_comment_recording": "Shot image recording",
+  "record_shots": true,
+  "shot_images_dir": "/home/admin/air-target-basic-main/shots",
+  "record_full_frame": false,
+  "record_crop_size": 200,
+  
+  "_comment_physical": "Physical setup information",
+  "bull_height_from_floor_ft": 5.0,
+  "typical_shooting_distance_ft": 20.0,
+  
+  "_comment_gpio": "Hardware integration",
+  "breakbeam_gpio": 17
+}
