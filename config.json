@@ -28,7 +28,7 @@
   
   "_comment_timing": "Shot detection timing (0.3s minimum = 9 frames @ 30fps)",
   "shot_cooldown_frames": 9,
-  "max_shot_interval_seconds": 120,
+  "max_shot_interval_seconds": 180,
   
   "_comment_camera": "Camera optimization settings",
   "auto_lock_exposure": true,
@@ -37,13 +37,13 @@
   "default_zoom": 1.0,
   "zoom_step": 0.1,
   "min_zoom": 1.0,
-  "max_zoom": 4.0,
+  "max_zoom": 5.0,
   "default_rotation": 0,
   "default_white_balance": 4000,
   
   "_comment_recording": "Shot image recording",
   "record_shots": true,
-  "shot_images_dir": "/home/pi/air-target/shots",
+  "shot_images_dir": "/home/admin/air-target-basic-main/shots",
   "record_full_frame": false,
   "record_crop_size": 200,
   
