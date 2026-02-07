@@ -1,39 +1,38 @@
 {
-  "cameras": [
-    0
-  ],
-  "enabled_cameras": [
-    0
-  ],
-  "shot_directory": "/home/admin/air-target/shots",
+  "cameras": [0],
+  "enabled_cameras": [0],
+  "shot_directory": "/home/admin/air-target-basic-main/shots",
+  "detection_fps": 5
+  
   "use_4_ring_scoring": true,
   "enable_bull_hole_bonus": false,
   "shots_per_round": 6,
+  
   "bull_hole_mm": 9.525,
   "bull_mm": 25.4,
-  "rings_mm": [
-    50.8,
-    76.2,
-    101.6,
-    127.0
-  ],
+  "rings_mm": [50.8, 76.2, 101.6, 127.0],
+  
   "min_area": 40,
   "max_area": 400,
   "min_confidence": 0.6,
   "shot_cooldown_frames": 9,
   "max_shot_interval_seconds": 120,
+  
   "default_rotation": 0,
   "default_white_balance": 4000,
   "default_zoom": 1.0,
   "zoom_step": 0.1,
   "min_zoom": 1.0,
   "max_zoom": 4.0,
+  
   "adaptive_threshold": true,
   "color_detection": true,
   "baseline_update_mode": "selective",
+  
   "record_shots": true,
   "record_full_frame": false,
   "crop_size": 200,
+  
   "exposure_stabilization_frames": 30,
   "enable_breakbeam": false
 }

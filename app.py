@@ -243,18 +243,24 @@ def optimize_cam(cam):
     return {"status": "OK", "camera": cam}
 
 
-@app.route("/set_zoom/<int:cam>/<float:zoom>")
-def set_camera_zoom(cam, zoom):
-    """Set camera zoom level."""
-    actual_zoom = set_zoom(cam, zoom)
-    return {"camera": cam, "zoom": actual_zoom}
+@app.route("/set_zoom/<int:cam>/<zoom>")  # Accept as string
+def set_zoom_route(cam, zoom):
+    try:
+        zoom_val = float(zoom)  # Handles "2" and "2.0"
+        new_zoom = set_zoom(cam, zoom_val)
+        return jsonify({"zoom": new_zoom})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-@app.route("/adjust_zoom/<int:cam>/<float:delta>")
-def adjust_camera_zoom(cam, delta):
-    """Adjust camera zoom by delta."""
-    new_zoom = adjust_zoom(cam, delta)
-    return {"camera": cam, "zoom": new_zoom}
+@app.route("/adjust_zoom/<int:cam>/<delta>")  # Accept as string
+def adjust_zoom_route(cam, delta):
+    try:
+        delta_val = float(delta)  # Parse string to float
+        new_zoom = adjust_zoom(cam, delta_val)
+        return jsonify({"zoom": new_zoom})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/get_zoom/<int:cam>")
@@ -277,6 +283,59 @@ def get_camera_rotation(cam):
     angle = get_rotation(cam)
     return {"camera": cam, "rotation": angle}
 
+@app.route("/set_brightness/<int:cam>/<int:value>")
+def set_brightness_route(cam, value):
+    try:
+        cap = get_camera(cam)
+        cap.set(cv2.CAP_PROP_BRIGHTNESS, value / 100.0)
+        return jsonify({"success": True, "brightness": value})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/set_contrast/<int:cam>/<int:value>")
+def set_contrast_route(cam, value):
+    try:
+        cap = get_camera(cam)
+        cap.set(cv2.CAP_PROP_CONTRAST, value / 100.0)
+        return jsonify({"success": True, "contrast": value})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/set_saturation/<int:cam>/<int:value>")
+def set_saturation_route(cam, value):
+    try:
+        cap = get_camera(cam)
+        cap.set(cv2.CAP_PROP_SATURATION, value / 100.0)
+        return jsonify({"success": True, "saturation": value})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/set_sharpness/<int:cam>/<int:value>")
+def set_sharpness_route(cam, value):
+    try:
+        cap = get_camera(cam)
+        cap.set(cv2.CAP_PROP_SHARPNESS, value / 100.0)
+        return jsonify({"success": True, "sharpness": value})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/get_camera_controls/<int:cam>")
+def get_camera_controls_route(cam):
+    try:
+        cap = get_camera(cam)
+        controls = {
+            "brightness": int(cap.get(cv2.CAP_PROP_BRIGHTNESS) * 100),
+            "contrast": int(cap.get(cv2.CAP_PROP_CONTRAST) * 100),
+            "saturation": int(cap.get(cv2.CAP_PROP_SATURATION) * 100),
+            "sharpness": int(cap.get(cv2.CAP_PROP_SHARPNESS) * 100)
+        }
+        return jsonify(controls)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ========== Scoring Configuration Endpoints ==========
 
@@ -438,6 +497,73 @@ def scoring():
     """Full scoring interface (external HTML)."""
     return render_template("scoring.html")
 
+@app.route("/camera")
+def camera_page():
+    return render_template("camera.html")
+
+@app.route("/help")
+def help_page():
+    return render_template("help.html")
+
+@app.route("/get_config")
+def get_config():
+    with open('config.json', 'r') as f:
+        config = json.load(f)
+    return jsonify(config)
+
+@app.route("/set_recording_config", methods=["POST"])
+def set_recording_config():
+    try:
+        data = request.json
+        with open('config.json', 'r') as f:
+            config = json.load(f)
+        
+        config['record_shots'] = data.get('record_shots', True)
+        config['record_full_frame'] = data.get('record_full_frame', False)
+        config['crop_size'] = data.get('crop_size', 200)
+        
+        with open('config.json', 'w') as f:
+            json.dump(config, f, indent=2)
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route("/set_shot_directory", methods=["POST"])
+def set_shot_directory():
+    try:
+        data = request.json
+        directory = data.get('directory', '')
+        os.makedirs(directory, exist_ok=True)
+        
+        with open('config.json', 'r') as f:
+            config = json.load(f)
+        config['shot_directory'] = directory
+        with open('config.json', 'w') as f:
+            json.dump(config, f, indent=2)
+        
+        return jsonify({"success": True, "directory": directory})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route("/set_advanced_config", methods=["POST"])
+def set_advanced_config():
+    try:
+        data = request.json
+        with open('config.json', 'r') as f:
+            config = json.load(f)
+        
+        config['adaptive_threshold'] = data.get('adaptive_threshold', True)
+        config['color_detection'] = data.get('color_detection', True)
+        config['min_confidence'] = data.get('min_confidence', 0.6)
+        config['shot_cooldown_frames'] = data.get('shot_cooldown_frames', 9)
+        
+        with open('config.json', 'w') as f:
+            json.dump(config, f, indent=2)
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 if __name__ == "__main__":
     # Initialize break-beam GPIO if available

@@ -20,6 +20,7 @@ hits = []
 detect_active = False
 shot_cooldown = 0
 last_shot_time = 0
+_last_detection_time = {}
 
 def toggle_detection():
     global detect_active, hits, baseline_saved
@@ -76,9 +77,25 @@ def detect_grey_marks(frame, baseline_frame):
 
 
 def process_frame(frame, cam_id):
-    global baseline, baseline_color, baseline_saved, shot_cooldown, last_shot_time
+    global baseline, baseline_color, baseline_saved, shot_cooldown, last_shot_time _last_detection_time
+    
+    # Get detection FPS from config (default 5 FPS)
+    detection_fps = cfg.get("detection_fps", 5)
+    interval = 1.0 / detection_fps  # e.g., 5 FPS = 0.2 second interval
+    
+    # Initialize timing for this camera
+    if cam_id not in _last_detection_time:
+        _last_detection_time[cam_id] = 0
     
     current_time = time.time()
+
+    # Skip detection if not enough time has passed
+    if current_time - _last_detection_time[cam_id] < interval:
+        # Just return frame with overlay (no detection)
+        return draw_overlay(frame, cam_id)
+    
+    # Update last detection time
+    _last_detection_time[cam_id] = current_time
 
     # Apply Gaussian blur
     frame = cv2.GaussianBlur(frame, (5, 5), 0)
@@ -89,14 +106,14 @@ def process_frame(frame, cam_id):
         baseline[cam_id] = gray.copy()
         baseline_color[cam_id] = frame.copy()
         baseline_saved[cam_id] = False
-        return draw_overlay(frame)
+        return draw_overlay(frame, cam_id)
 
     # Detection OFF
     if not detect_active:
         baseline[cam_id] = gray.copy()
         baseline_color[cam_id] = frame.copy()
         baseline_saved[cam_id] = False
-        return draw_overlay(frame)
+        return draw_overlay(frame, cam_id)
 
     # Save baseline at start of round
     if not baseline_saved.get(cam_id, False):
@@ -255,7 +272,7 @@ def process_frame(frame, cam_id):
         baseline[cam_id] = gray.copy()
         baseline_color[cam_id] = frame.copy()
 
-    return draw_overlay(frame)
+    return draw_overlay(frame, cam_id)
 
 
 def get_round_summary():

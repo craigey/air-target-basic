@@ -23,8 +23,16 @@ def draw_overlay(frame, cam_id=0):
 
     # Heatmap overlay
     if is_heatmap_enabled():
-        heatmap = get_heatmap_normalized()
-        for (x, y) in heatmap:
-            cv2.circle(frame, (int(x), int(y)), 2, (0, 255, 255), -1)
+        try:
+            heatmap = get_heatmap_normalized()
+            for point in heatmap:
+                # Handle different heatmap formats
+                if isinstance(point, (list, tuple)):
+                    if len(point) >= 2:
+                        x, y = point[0], point[1]
+                        cv2.circle(frame, (int(x), int(y)), 2, (0, 255, 255), -1)
+        except Exception as e:
+            # Silently fail if heatmap has issues
+            pass
 
     return frame

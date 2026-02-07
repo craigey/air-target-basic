@@ -376,5 +376,13 @@ def enable_recording(enabled=True):
     print(f"📸 Recording {'enabled' if enabled else 'disabled'}")
 
 
+def set_shots_directory(directory):
+    """Update shots directory path."""
+    global SHOTS_DIR, _current_round_dir
+    SHOTS_DIR = directory
+    _current_round_dir = None
+    os.makedirs(SHOTS_DIR, exist_ok=True)
+    print(f"✅ Shot directory updated: {SHOTS_DIR}")
+
 # Initialize on import
 init_shot_recorder()
