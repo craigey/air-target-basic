@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Recorded Rounds</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #0a0a0a;
+      color: #f0f0f0;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .nav-bar {
+      background: #000;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #333;
+    }
+    .nav-btn {
+      background: #222;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      border: 1px solid #444;
+      display: inline-block;
+      margin-left: 10px;
+    }
+    .nav-btn:hover {
+      background: #333;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+      background: #161616;
+      border: 2px solid #333;
+      border-radius: 8px;
+      margin-top: 40px;
+    }
+    .empty-state h2 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #c5a000;
+    }
+    .btn-primary {
+      background: #4CAF50;
+      border-color: #4CAF50;
+      padding: 12px 24px;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 700;
+      display: inline-block;
+      margin-top: 20px;
+    }
+    .btn-primary:hover {
+      background: #45a049;
+    }
+  </style>
+<link rel="stylesheet" href="/static/modal-theme.css">
+</head>
+<body>
+
+<!-- Navigation -->
+<div class="nav-bar">
+  <div>
+    <h2 style="margin: 0; color: #c5a000;">📂 Recorded Rounds</h2>
+  </div>
+  <div>
+    <a href="/" class="nav-btn">← Back to Main</a>
+    <a href="/settings" class="nav-btn">⚙️ Settings</a>
+    <a href="/spectator_fullscreen" class="nav-btn">👥 Spectator</a>
+  </div>
+</div>
+
+<div class="container">
+  <div class="empty-state">
+    <h2>📂 Rounds Viewer</h2>
+    <p>This feature displays recorded rounds and shot images.</p>
+    <p style="margin-top: 20px; color: #888;">
+      Recording is enabled in Settings → Shot Recording<br>
+      Rounds are saved to: <code style="color: #c5a000;">/home/pi/air-target/shots/</code>
+    </p>
+    <a href="/" class="btn-primary">
+      Go to Main Page
+    </a>
+    <a href="/settings" class="btn-primary" style="margin-left: 10px;">
+      Configure Recording
+    </a>
+  </div>
+</div>
+<script src="/static/modal-theme.js"></script>
+</body>
+</html>

@@ -9,7 +9,7 @@ cfg = json.load(open("config.json"))
 
 # Shot recording state
 _recording_enabled = cfg.get("record_shots", True)
-_shots_dir = cfg.get("shot_images_dir", "/home/pi/air-target/shots")
+_shots_dir = cfg.get("shot_images_dir", "/home/admin/air-target-basic-main/shots")
 _current_round_dir = None
 _shot_images = []  # List of (filepath, shot_data) tuples
 
