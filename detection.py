@@ -77,7 +77,7 @@ def detect_grey_marks(frame, baseline_frame):
 
 
 def process_frame(frame, cam_id):
-    global baseline, baseline_color, baseline_saved, shot_cooldown, last_shot_time _last_detection_time
+    global baseline, baseline_color, baseline_saved, shot_cooldown, last_shot_time, _last_detection_time
     
     # Get detection FPS from config (default 5 FPS)
     detection_fps = cfg.get("detection_fps", 5)
