@@ -2,7 +2,7 @@
   "cameras": [0],
   "enabled_cameras": [0],
   "shot_directory": "/home/admin/air-target-basic-main/shots",
-  "detection_fps": 5
+  "detection_fps": 5,
   
   "use_4_ring_scoring": true,
   "enable_bull_hole_bonus": false,
