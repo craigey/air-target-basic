@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>System Help</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/modal-theme.css">
+  <style>
+    body { margin: 0; padding: 0; background: #0a0a0a; color: #f0f0f0; font-family: 'Segoe UI', sans-serif; }
+    .nav-bar { background: #000; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; }
+    .nav-btn { background: #222; color: #fff; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 700; border: 1px solid #444; margin-left: 10px; transition: all 0.2s; }
+    .nav-btn:hover { background: #333; }
+    .nav-btn.active { background: #c5a000; color: #000; border-color: #c5a000; }
+    
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .section { background: #161616; border: 2px solid #333; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .section-header { font-size: 20px; font-weight: 700; color: #c5a000; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #333; }
+    
+    .endpoint-list { display: grid; gap: 10px; }
+    .endpoint { background: #0a0a0a; padding: 12px; border-radius: 6px; border: 1px solid #444; font-family: 'Courier New', monospace; }
+    .method { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-right: 10px; }
+    .method-get { background: #1a4d1a; color: #4f8; }
+    .method-post { background: #1a3d4d; color: #4af; }
+    .url { color: #c5a000; }
+    .description { color: #888; font-size: 12px; margin-top: 5px; font-family: 'Segoe UI', sans-serif; }
+    
+    code { background: #000; color: #c5a000; padding: 2px 6px; border-radius: 3px; }
+    
+    .page-link { display: block; background: #0a0a0a; padding: 12px; border-radius: 6px; border: 1px solid #444; margin: 8px 0; text-decoration: none; color: #c5a000; font-weight: 700; transition: all 0.2s; }
+    .page-link:hover { background: #1a1a1a; border-color: #c5a000; }
+  </style>
+</head>
+<body>
+
+<div class="nav-bar">
+  <div><h2 style="margin: 0; color: #c5a000;">❓ System Help</h2></div>
+  <div>
+    <a href="/" class="nav-btn">🏠 Main</a>
+    <a href="/camera" class="nav-btn">📹 Camera</a>
+    <a href="/settings" class="nav-btn">⚙️ Settings</a>
+    <a href="/rounds" class="nav-btn">📂 Rounds</a>
+    <a href="/spectator_fullscreen" class="nav-btn">👥 Spectator</a>
+    <a href="/help" class="nav-btn active">❓ Help</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Pages -->
+  <div class="section">
+    <div class="section-header">📄 Pages</div>
+    <a href="/" class="page-link">🏠 Main - Multi-camera shooting interface</a>
+    <a href="/camera" class="page-link">📹 Camera - Camera configuration & calibration</a>
+    <a href="/settings" class="page-link">⚙️ Settings - Match, recording & advanced settings</a>
+    <a href="/rounds" class="page-link">📂 Rounds - View recorded rounds</a>
+    <a href="/spectator_fullscreen" class="page-link">👥 Spectator - Full-screen multi-camera display</a>
+  </div>
+
+  <!-- Detection API -->
+  <div class="section">
+    <div class="section-header">🎯 Detection & Scoring API</div>
+    <div class="endpoint-list">
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/toggle</span>
+        <div class="description">Start/stop detection on all cameras</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/reset</span>
+        <div class="description">Reset all cameras and start new round</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/hits</span>
+        <div class="description">Get all hits from all cameras</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/hits/{cam_id}</span>
+        <div class="description">Get hits for specific camera (e.g., /hits/0)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/get_scoring_config</span>
+        <div class="description">Get current scoring configuration</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-post">POST</span>
+        <span class="url">/set_scoring_config</span>
+        <div class="description">Update scoring rules (4-ring, bull hole bonus, shots per round)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera API -->
+  <div class="section">
+    <div class="section-header">📹 Camera Control API</div>
+    <div class="endpoint-list">
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/camera_urls</span>
+        <div class="description">List all connected cameras</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/camera_info/{cam_id}</span>
+        <div class="description">Get camera status (zoom, rotation, exposure, etc.)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/video/{cam_id}</span>
+        <div class="description">Live video stream with detection overlays</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/raw_video/{cam_id}</span>
+        <div class="description">Raw video stream without overlays (for calibration)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_zoom/{cam_id}/{value}</span>
+        <div class="description">Set zoom level (1.0 - 4.0)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/adjust_zoom/{cam_id}/{delta}</span>
+        <div class="description">Adjust zoom by delta (e.g., +0.1 or -0.5)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_rotation/{cam_id}/{angle}</span>
+        <div class="description">Set rotation angle (0, 90, 180, 270)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/lock_exposure/{cam_id}</span>
+        <div class="description">Lock camera exposure</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/unlock_exposure/{cam_id}</span>
+        <div class="description">Unlock camera exposure</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/lock_white_balance/{cam_id}</span>
+        <div class="description">Lock white balance</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/unlock_white_balance/{cam_id}</span>
+        <div class="description">Unlock white balance</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_white_balance/{cam_id}/{temp}</span>
+        <div class="description">Set white balance temperature (2800, 4000, 5500, 6500)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/optimize_camera/{cam_id}</span>
+        <div class="description">Auto-optimize camera settings</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calibration API -->
+  <div class="section">
+    <div class="section-header">🎯 Calibration API</div>
+    <div class="endpoint-list">
+      <div class="endpoint">
+        <span class="method method-post">POST</span>
+        <span class="url">/set_calibration</span>
+        <div class="description">Save calibration points (camera_id, center, bull, outer)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Configuration API -->
+  <div class="section">
+    <div class="section-header">⚙️ Configuration API</div>
+    <div class="endpoint-list">
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/get_config</span>
+        <div class="description">Get complete system configuration</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-post">POST</span>
+        <span class="url">/set_recording_config</span>
+        <div class="description">Update recording settings</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-post">POST</span>
+        <span class="url">/set_shot_directory</span>
+        <div class="description">Set shot recording directory path</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-post">POST</span>
+        <span class="url">/set_advanced_config</span>
+        <div class="description">Update advanced detection settings</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Start -->
+  <div class="section">
+    <div class="section-header">🚀 Quick Start Guide</div>
+    <ol style="line-height: 1.8; color: #ddd;">
+      <li><strong>Configure Cameras</strong> - Go to Camera page, set zoom/rotation for each camera</li>
+      <li><strong>Calibrate</strong> - On Camera page, click 3 points on target preview</li>
+      <li><strong>Configure Match</strong> - Go to Settings, set scoring rules and recording options</li>
+      <li><strong>Start Shooting</strong> - Return to Main page, click "Start All Cameras"</li>
+      <li><strong>View Results</strong> - Scores appear in real-time, view saved rounds in Rounds page</li>
+    </ol>
+  </div>
+
+  <!-- Keyboard Shortcuts -->
+  <div class="section">
+    <div class="section-header">⌨️ Keyboard Shortcuts (Spectator Page)</div>
+    <div style="display: grid; grid-template-columns: auto 1fr; gap: 10px; color: #ddd;">
+      <code>F</code><span>Toggle fullscreen</span>
+      <code>H</code><span>Toggle heatmap</span>
+      <code>R</code><span>Reset scores</span>
+      <code>Space</code><span>Start/stop detection</span>
+    </div>
+  </div>
+
+</div>
+
+<script src="/static/modal-theme.js"></script>
+
+</body>
+</html>

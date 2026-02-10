@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Settings</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/modal-theme.css">
+  <style>
+    body { margin: 0; padding: 0; background: #0a0a0a; color: #f0f0f0; font-family: 'Segoe UI', sans-serif; }
+    .nav-bar { background: #000; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; }
+    .nav-btn { background: #222; color: #fff; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 700; border: 1px solid #444; margin-left: 10px; transition: all 0.2s; }
+    .nav-btn:hover { background: #333; }
+    .nav-btn.active { background: #c5a000; color: #000; border-color: #c5a000; }
+    
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .section { background: #161616; border: 2px solid #333; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .section-header { font-size: 20px; font-weight: 700; color: #c5a000; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #333; }
+    
+    .form-group { margin: 15px 0; }
+    .form-label { display: block; font-size: 13px; font-weight: 700; color: #ddd; margin-bottom: 8px; }
+    .form-help { font-size: 11px; color: #888; margin-top: 5px; }
+    
+    input[type="checkbox"] { width: 18px; height: 18px; margin-right: 8px; cursor: pointer; }
+    input[type="text"] { background: #000; color: #c5a000; border: 1px solid #444; padding: 10px 12px; border-radius: 4px; font-weight: 700; font-size: 14px; width: 100%; max-width: 600px; }
+    select { background: #000; color: #c5a000; border: 1px solid #444; padding: 8px 12px; border-radius: 4px; font-weight: 700; font-size: 14px; }
+    
+    .btn-small { padding: 8px 16px; font-size: 13px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: 700; margin-top: 10px; }
+    .btn-small:hover { background: #333; }
+    .btn-primary { background: #4CAF50; border-color: #4CAF50; }
+    .btn-primary:hover { background: #45a049; }
+    
+    .info-box { background: #0a0a0a; padding: 12px; border-radius: 6px; border: 1px solid #444; margin-top: 10px; }
+    code { color: #c5a000; background: #000; padding: 2px 6px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<div class="nav-bar">
+  <div><h2 style="margin: 0; color: #c5a000;">⚙️ Settings</h2></div>
+  <div>
+    <a href="/" class="nav-btn">🏠 Main</a>
+    <a href="/camera" class="nav-btn">📹 Camera</a>
+    <a href="/settings" class="nav-btn active">⚙️ Settings</a>
+    <a href="/rounds" class="nav-btn">📂 Rounds</a>
+    <a href="/spectator_fullscreen" class="nav-btn">👥 Spectator</a>
+    <a href="/help" class="nav-btn">❓ Help</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Match Settings -->
+  <div class="section">
+    <div class="section-header">🎯 Match Settings</div>
+    
+    <div class="form-group">
+      <label class="form-label">
+        <input type="checkbox" id="use4Ring" onchange="saveScoringConfig()">
+        Use 4-Ring Scoring
+      </label>
+      <div class="form-help">
+        ✓ Checked: 5" outer ring = 1 point (Bull=5, 2"=4, 3"=3, 4"=2, 5"=1)<br>
+        ✗ Unchecked: 3-ring scoring (Bull=5, 2"=4, 3"=3, 4"=2, Outside=0)
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">
+        <input type="checkbox" id="bullHoleBonus" onchange="saveScoringConfig()">
+        Enable Bull Hole Bonus (5.1 points)
+      </label>
+      <div class="form-help">Awards 5.1 points for pellet through bull hole without visible mark</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Shots Per Round</label>
+      <select id="shotsPerRound" onchange="saveScoringConfig()">
+        <option value="5">5 Shots</option>
+        <option value="6" selected>6 Shots</option>
+        <option value="10">10 Shots</option>
+      </select>
+      <div class="form-help">Number of shots in a complete round</div>
+    </div>
+  </div>
+
+  <!-- Recording Settings -->
+  <div class="section">
+    <div class="section-header">📸 Shot Recording</div>
+    
+    <div class="form-group">
+      <label class="form-label">
+        <input type="checkbox" id="recordingEnabled" checked onchange="saveRecordingConfig()">
+        Enable Shot Recording
+      </label>
+      <div class="form-help">Save image of each shot for review</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">
+        <input type="checkbox" id="recordFullFrame" onchange="saveRecordingConfig()">
+        Record Full Frame
+      </label>
+      <div class="form-help">Save entire frame instead of cropped region</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Crop Size (pixels)</label>
+      <select id="cropSize" onchange="saveRecordingConfig()">
+        <option value="150">150x150 (Small)</option>
+        <option value="200" selected>200x200 (Medium)</option>
+        <option value="300">300x300 (Large)</option>
+      </select>
+      <div class="form-help">Size of cropped shot images</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Shot Directory Path</label>
+      <input type="text" id="shotDirectory" placeholder="/home/admin/air-target/shots">
+      <button class="btn-small btn-primary" onclick="saveShotDirectory()">Save Directory</button>
+      <div class="form-help">
+        Location where shot images and rounds are saved. Directory will be created if it doesn't exist.
+      </div>
+      <div class="info-box" style="margin-top: 10px;">
+        <div style="font-size: 12px; color: #888; margin-bottom: 5px;">Current Directory:</div>
+        <code id="currentShotDir">/home/admin/air-target/shots</code>
+        <div style="font-size: 11px; color: #666; margin-top: 5px;">
+          Total rounds: <span id="totalRounds">-</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Advanced Settings -->
+  <div class="section">
+    <div class="section-header">🔧 Advanced Detection</div>
+    
+    <div class="form-group">
+      <label class="form-label">
+        <input type="checkbox" id="adaptiveThreshold" checked onchange="saveAdvancedConfig()">
+        Adaptive Threshold
+      </label>
+      <div class="form-help">Use adaptive thresholding for better detection in varying light</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">
+        <input type="checkbox" id="colorDetection" checked onchange="saveAdvancedConfig()">
+        Color Detection
+      </label>
+      <div class="form-help">Detect grey lead marks using color analysis</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Minimum Confidence</label>
+      <input type="range" id="minConfidence" min="0.3" max="0.9" step="0.05" value="0.6" oninput="updateConfidenceValue(this.value)" onchange="saveAdvancedConfig()">
+      <div class="value-display" style="font-size: 16px; color: #c5a000; font-weight: 700; margin: 5px 0;">
+        <span id="confidenceValue">0.6</span>
+      </div>
+      <div class="form-help">Minimum AI confidence required to register a shot (higher = fewer false positives)</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Shot Cooldown (frames)</label>
+      <input type="number" id="shotCooldown" min="0" max="30" value="9" onchange="saveAdvancedConfig()" style="width: 100px;">
+      <div class="form-help">Number of frames to skip after detecting a shot (prevents duplicates)</div>
+    </div>
+  </div>
+
+</div>
+
+<script src="/static/modal-theme.js"></script>
+<script>
+window.onload = function() {
+  loadAllSettings();
+};
+
+async function loadAllSettings() {
+  try {
+    const scoreResponse = await fetch('/get_scoring_config');
+    const scoreData = await scoreResponse.json();
+    
+    document.getElementById('use4Ring').checked = scoreData.use_4_ring;
+    document.getElementById('bullHoleBonus').checked = scoreData.enable_bull_hole_bonus;
+    document.getElementById('shotsPerRound').value = scoreData.shots_per_round || 6;
+    
+    const configResponse = await fetch('/get_config');
+    const config = await configResponse.json();
+    
+    document.getElementById('recordingEnabled').checked = config.record_shots;
+    document.getElementById('recordFullFrame').checked = config.record_full_frame;
+    document.getElementById('cropSize').value = config.crop_size || 200;
+    document.getElementById('shotDirectory').value = config.shot_directory || '/home/admin/air-target/shots';
+    document.getElementById('currentShotDir').textContent = config.shot_directory || '/home/admin/air-target/shots';
+    
+    document.getElementById('adaptiveThreshold').checked = config.adaptive_threshold;
+    document.getElementById('colorDetection').checked = config.color_detection;
+    document.getElementById('minConfidence').value = config.min_confidence || 0.6;
+    document.getElementById('confidenceValue').textContent = config.min_confidence || 0.6;
+    document.getElementById('shotCooldown').value = config.shot_cooldown_frames || 9;
+    
+  } catch (err) {
+    showToast('Failed to load settings', 'error');
+  }
+}
+
+async function saveScoringConfig() {
+  const config = {
+    use_4_ring: document.getElementById('use4Ring').checked,
+    enable_bull_hole_bonus: document.getElementById('bullHoleBonus').checked,
+    shots_per_round: parseInt(document.getElementById('shotsPerRound').value)
+  };
+
+  try {
+    await fetch('/set_scoring_config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(config)
+    });
+    showToast('Scoring settings saved', 'success');
+  } catch (err) {
+    showToast('Failed to save scoring settings', 'error');
+  }
+}
+
+async function saveRecordingConfig() {
+  const config = {
+    record_shots: document.getElementById('recordingEnabled').checked,
+    record_full_frame: document.getElementById('recordFullFrame').checked,
+    crop_size: parseInt(document.getElementById('cropSize').value)
+  };
+
+  try {
+    await fetch('/set_recording_config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(config)
+    });
+    showToast('Recording settings saved', 'success');
+  } catch (err) {
+    showToast('Failed to save recording settings', 'error');
+  }
+}
+
+async function saveShotDirectory() {
+  const directory = document.getElementById('shotDirectory').value.trim();
+  
+  if (!directory) {
+    showToast('Please enter a directory path', 'warning');
+    return;
+  }
+
+  try {
+    const response = await fetch('/set_shot_directory', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ directory: directory })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      document.getElementById('currentShotDir').textContent = directory;
+      showToast('Shot directory updated', 'success');
+    } else {
+      showToast(result.error || 'Failed to set directory', 'error');
+    }
+  } catch (err) {
+    showToast('Failed to save directory', 'error');
+  }
+}
+
+async function saveAdvancedConfig() {
+  const config = {
+    adaptive_threshold: document.getElementById('adaptiveThreshold').checked,
+    color_detection: document.getElementById('colorDetection').checked,
+    min_confidence: parseFloat(document.getElementById('minConfidence').value),
+    shot_cooldown_frames: parseInt(document.getElementById('shotCooldown').value)
+  };
+
+  try {
+    await fetch('/set_advanced_config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(config)
+    });
+    showToast('Advanced settings saved', 'success');
+  } catch (err) {
+    showToast('Failed to save advanced settings', 'error');
+  }
+}
+
+function updateConfidenceValue(value) {
+  document.getElementById('confidenceValue').textContent = value;
+}
+</script>
+
+</body>
+</html>

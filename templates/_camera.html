@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Camera Configuration</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/modal-theme.css">
+  <style>
+    body { margin: 0; padding: 0; background: #0a0a0a; color: #f0f0f0; font-family: 'Segoe UI', sans-serif; }
+    .nav-bar { background: #000; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; }
+    .nav-btn { background: #222; color: #fff; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 700; border: 1px solid #444; margin-left: 10px; transition: all 0.2s; }
+    .nav-btn:hover { background: #333; }
+    .nav-btn.active { background: #c5a000; color: #000; border-color: #c5a000; }
+    
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    .section { background: #161616; border: 2px solid #333; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .section-header { font-size: 20px; font-weight: 700; color: #c5a000; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #333; }
+    
+    .form-group { margin: 15px 0; }
+    .form-label { display: block; font-size: 13px; font-weight: 700; color: #ddd; margin-bottom: 8px; }
+    .form-help { font-size: 11px; color: #888; margin-top: 5px; }
+    
+    select, input[type="number"], input[type="text"] { background: #000; color: #c5a000; border: 1px solid #444; padding: 8px 12px; border-radius: 4px; font-weight: 700; font-size: 14px; }
+    
+    .preview-container { background: #000; border: 2px solid #333; border-radius: 8px; overflow: hidden; position: relative; max-width: 800px; margin: 15px 0; }
+    .preview-video { width: 100%; display: block; }
+    .preview-overlay { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.7); padding: 8px 12px; border-radius: 4px; font-size: 12px; color: #c5a000; }
+    
+    .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+    .btn-small { padding: 8px 16px; font-size: 13px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: 700; transition: all 0.2s; }
+    .btn-small:hover { background: #333; }
+    .btn-small.active { background: #4CAF50; border-color: #4CAF50; }
+    .btn-small.locked { background: #f44336; border-color: #f44336; }
+    .btn-primary { background: #4CAF50; border-color: #4CAF50; }
+    .btn-primary:hover { background: #45a049; }
+    
+    .slider { width: 100%; max-width: 400px; }
+    .value-display { font-size: 16px; color: #c5a000; font-weight: 700; margin: 5px 0; }
+    
+    .calibration-viewport { position: relative; cursor: crosshair; }
+    .calibration-viewport.disabled { cursor: not-allowed; pointer-events: none; opacity: 0.6; }
+    .calibration-point { position: absolute; width: 12px; height: 12px; background: #4CAF50; border: 2px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); z-index: 10; pointer-events: none; }
+    .calibration-step { background: #1a4d1a; color: #4f8; padding: 10px; border-radius: 6px; margin: 10px 0; font-weight: 700; border: 2px solid #4f8; font-size: 12px; }
+    .calibration-complete { background: #1a4d1a; color: #4f8; padding: 10px; border-radius: 6px; margin: 10px 0; font-weight: 700; border: 2px solid #4f8; font-size: 12px; }
+    .quality-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-left: 10px; }
+    .quality-good { background: #1a4d1a; color: #4f8; border: 1px solid #4f8; }
+    .quality-poor { background: #4d1a1a; color: #f44; border: 1px solid #f44; }
+  </style>
+</head>
+<body>
+
+<div class="nav-bar">
+  <div><h2 style="margin: 0; color: #c5a000;">📹 Camera Configuration</h2></div>
+  <div>
+    <a href="/" class="nav-btn">🏠 Main</a>
+    <a href="/camera" class="nav-btn active">📹 Camera</a>
+    <a href="/settings" class="nav-btn">⚙️ Settings</a>
+    <a href="/rounds" class="nav-btn">📂 Rounds</a>
+    <a href="/spectator_fullscreen" class="nav-btn">👥 Spectator</a>
+    <a href="/help" class="nav-btn">❓ Help</a>
+  </div>
+</div>
+
+<div class="container">
+  
+  <div class="section">
+    <div class="section-header">📹 Select Camera</div>
+    <div class="form-group">
+      <label class="form-label">Camera</label>
+      <select id="cameraSelect" onchange="changeCamera()"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Lane Name</label>
+      <input type="text" id="laneName" placeholder="Lane 1" style="width: 200px;">
+      <button class="btn-small btn-primary" onclick="saveLaneName()" style="margin-left: 10px;">Save</button>
+      <div class="form-help">Customize the display name for this lane</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">📺 Live Preview</div>
+    <div class="preview-container">
+      <img id="previewVideo" class="preview-video" src="/raw_video/1">
+      <div class="preview-overlay">
+        <span id="previewCamLabel">Camera 1</span> - <span id="previewLaneLabel">Lane 1</span> | 
+        Zoom: <span id="previewZoom">1.0x</span> | 
+        Rotation: <span id="previewRotation">0°</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">🔍 Zoom</div>
+    <div class="form-group">
+      <label class="form-label">Zoom Level (1.0x - 4.0x)</label>
+      <div class="btn-group">
+        <button class="btn-small" onclick="adjustZoom(-0.5)">−− 0.5</button>
+        <button class="btn-small" onclick="adjustZoom(-0.1)">− 0.1</button>
+        <span class="value-display" id="zoomValue">1.0x</span>
+        <button class="btn-small" onclick="adjustZoom(0.1)">+ 0.1</button>
+        <button class="btn-small" onclick="adjustZoom(0.5)">++ 0.5</button>
+        <button class="btn-small" onclick="setZoom(1.0)">Reset</button>
+      </div>
+      <input type="range" id="zoomSlider" class="slider" min="1.0" max="4.0" step="0.1" value="1.0" oninput="setZoom(parseFloat(this.value))">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">🔄 Rotation</div>
+    <div class="form-group">
+      <label class="form-label">Rotation Presets</label>
+      <div class="btn-group">
+        <button class="btn-small" onclick="setRotation(0)">0° Normal</button>
+        <button class="btn-small" onclick="setRotation(90)">90° Right</button>
+        <button class="btn-small" onclick="setRotation(180)">180° Upside Down</button>
+        <button class="btn-small" onclick="setRotation(270)">270° Left</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Rotation Angle (0° - 359°)</label>
+      <input type="range" id="rotationSlider" class="slider" min="0" max="359" value="0" oninput="setRotation(parseInt(this.value))">
+      <div class="value-display">Current: <span id="rotationValue">0°</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">⚙️ White Balance & Exposure</div>
+    <div class="form-group">
+      <label class="form-label">White Balance</label>
+      <div class="btn-group">
+        <button class="btn-small" id="wbAutoBtn" onclick="setWBMode('auto')">Auto</button>
+        <button class="btn-small" onclick="setWBTemp(2800)">Tungsten 2800K</button>
+        <button class="btn-small" onclick="setWBTemp(4000)">Fluorescent 4000K</button>
+        <button class="btn-small" onclick="setWBTemp(5500)">Daylight 5500K</button>
+        <button class="btn-small" onclick="setWBTemp(6500)">Cloudy 6500K</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Exposure</label>
+      <button class="btn-small" id="exposureBtn" onclick="toggleExposure()">Lock Exposure</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">⚡ Quick Actions</div>
+    <div class="btn-group">
+      <button class="btn-small btn-primary" onclick="optimizeCamera()">⚙️ Optimize Camera</button>
+      <button class="btn-small btn-primary" onclick="lockAllSettings()">🔒 Lock All Settings</button>
+      <button class="btn-small" onclick="resetAllSettings()">🔄 Reset All</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">🎯 Calibration <span id="qualityBadge"></span></div>
+    <div class="form-help" style="margin-bottom: 15px;">
+      <strong>⚠️ Important:</strong> Set zoom and rotation BEFORE calibrating. Click 3 points on preview.
+    </div>
+    
+    <div class="calibration-step" id="calStep">
+      Step 1: Click <strong>center of bull hole</strong>
+    </div>
+    
+    <div class="calibration-viewport" id="calViewport">
+      <img class="preview-video" src="/raw_video/1" id="calImage" onclick="handleCalibrationClick(event)">
+    </div>
+    
+    <div class="btn-group" style="margin-top: 15px;">
+      <button class="btn-small" onclick="resetCalibration()">Reset Points</button>
+      <button class="btn-small btn-primary" onclick="testCalibration()">Test Calibration</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="/static/modal-theme.js"></script>
+<script>
+let currentCamera = 1;  // Start from 1 instead of 0
+let calibrationPoints = [];
+let allCameras = [];
+let calibrationComplete = false;
+let laneNames = {};
+
+window.onload = function() {
+  initCameras();
+  setInterval(updatePreview, 100);
+  loadLaneNames();
+};
+
+async function initCameras() {
+  try {
+    const response = await fetch('/camera_urls');
+    const data = await response.json();
+    allCameras = data.cameras;
+    
+    const select = document.getElementById('cameraSelect');
+    select.innerHTML = '';
+    allCameras.forEach(cam => {
+      const option = document.createElement('option');
+      const camNum = cam.camera_id + 1;  // Display as 1-based
+      option.value = cam.camera_id;
+      option.textContent = `Camera ${camNum}`;
+      select.appendChild(option);
+    });
+    
+    if (allCameras.length > 0) {
+      currentCamera = allCameras[0].camera_id;
+      changeCamera();
+    }
+  } catch (err) {
+    showToast('Failed to load cameras', 'error');
+  }
+}
+
+async function loadLaneNames() {
+  try {
+    const response = await fetch('/get_lane_names');
+    const data = await response.json();
+    laneNames = data || {};
+  } catch (err) {
+    console.log('No saved lane names');
+  }
+}
+
+async function saveLaneName() {
+  const name = document.getElementById('laneName').value.trim();
+  if (!name) {
+    showToast('Please enter a lane name', 'warning');
+    return;
+  }
+  
+  try {
+    await fetch('/set_lane_name', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({camera_id: currentCamera, name: name})
+    });
+    laneNames[currentCamera] = name;
+    document.getElementById('previewLaneLabel').textContent = name;
+    showToast('Lane name saved', 'success');
+  } catch (err) {
+    showToast('Failed to save lane name', 'error');
+  }
+}
+
+function changeCamera() {
+  currentCamera = parseInt(document.getElementById('cameraSelect').value);
+  const camNum = currentCamera + 1;
+  
+  document.getElementById('previewVideo').src = `/raw_video/${currentCamera}?t=${Date.now()}`;
+  document.getElementById('calImage').src = `/raw_video/${currentCamera}?t=${Date.now()}`;
+  document.getElementById('previewCamLabel').textContent = `Camera ${camNum}`;
+  
+  const laneName = laneNames[currentCamera] || `Lane ${camNum}`;
+  document.getElementById('laneName').value = laneName;
+  document.getElementById('previewLaneLabel').textContent = laneName;
+  
+  loadCameraSettings();
+  calibrationPoints = [];
+  calibrationComplete = false;
+  document.querySelectorAll('.calibration-point').forEach(p => p.remove());
+  document.getElementById('calStep').innerHTML = 'Step 1: Click <strong>center of bull hole</strong>';
+  document.getElementById('calViewport').classList.remove('disabled');
+}
+
+function updatePreview() {
+  document.getElementById('previewZoom').textContent = document.getElementById('zoomValue').textContent;
+  document.getElementById('previewRotation').textContent = document.getElementById('rotationValue').textContent;
+}
+
+async function loadCameraSettings() {
+  try {
+    const response = await fetch(`/camera_info/${currentCamera}`);
+    const data = await response.json();
+    
+    const zoom = data.zoom || 1.0;
+    document.getElementById('zoomValue').textContent = zoom.toFixed(1) + 'x';
+    document.getElementById('zoomSlider').value = zoom;
+    
+    const rotation = data.rotation || 0;
+    document.getElementById('rotationValue').textContent = rotation + '°';
+    document.getElementById('rotationSlider').value = rotation;
+  } catch (err) {
+    console.error('Failed to load camera settings');
+  }
+}
+
+async function adjustZoom(delta) {
+  try {
+    const response = await fetch(`/adjust_zoom/${currentCamera}/${delta}`);
+    const data = await response.json();
+    if (data.error) {
+      showToast('Zoom adjustment failed', 'error');
+    } else {
+      document.getElementById('zoomValue').textContent = data.zoom.toFixed(1) + 'x';
+      document.getElementById('zoomSlider').value = data.zoom;
+      showToast('Zoom adjusted', 'success');
+    }
+  } catch (err) {
+    showToast('Zoom adjustment failed', 'error');
+  }
+}
+
+async function setZoom(value) {
+  try {
+    const response = await fetch(`/set_zoom/${currentCamera}/${value}`);
+    const data = await response.json();
+    if (!data.error) {
+      document.getElementById('zoomValue').textContent = data.zoom.toFixed(1) + 'x';
+      document.getElementById('zoomSlider').value = data.zoom;
+    }
+  } catch (err) {}
+}
+
+async function setRotation(angle) {
+  try {
+    const response = await fetch(`/set_rotation/${currentCamera}/${angle}`);
+    const data = await response.json();
+    document.getElementById('rotationValue').textContent = data.rotation + '°';
+    document.getElementById('rotationSlider').value = data.rotation;
+    showToast('Rotation set', 'success');
+  } catch (err) {
+    showToast('Rotation set failed', 'error');
+  }
+}
+
+async function toggleExposure() {
+  try {
+    const expLocked = document.getElementById('exposureBtn').classList.contains('locked');
+    const endpoint = expLocked ? '/unlock_exposure/' : '/lock_exposure/';
+    await fetch(endpoint + currentCamera);
+    
+    const btn = document.getElementById('exposureBtn');
+    btn.classList.toggle('locked');
+    btn.classList.toggle('active');
+    btn.textContent = expLocked ? 'Lock Exposure' : 'Exposure Locked ✓';
+    showToast(expLocked ? 'Exposure unlocked' : 'Exposure locked', 'success');
+  } catch (err) {
+    showToast('Failed to toggle exposure', 'error');
+  }
+}
+
+async function setWBMode(mode) {
+  try {
+    await fetch(`/unlock_white_balance/${currentCamera}`);
+    showToast('White balance: Auto', 'success');
+  } catch (err) {
+    showToast('Failed to update white balance', 'error');
+  }
+}
+
+async function setWBTemp(temp) {
+  try {
+    await fetch(`/lock_white_balance/${currentCamera}`);
+    await fetch(`/set_white_balance/${currentCamera}/${temp}`);
+    showToast(`White balance: ${temp}K`, 'success');
+  } catch (err) {
+    showToast('Failed to set white balance', 'error');
+  }
+}
+
+async function optimizeCamera() {
+  try {
+    await fetch(`/optimize_camera/${currentCamera}`);
+    showToast('Camera optimized', 'success');
+  } catch (err) {
+    showToast('Failed to optimize', 'error');
+  }
+}
+
+async function lockAllSettings() {
+  try {
+    await fetch(`/lock_exposure/${currentCamera}`);
+    await fetch(`/lock_white_balance/${currentCamera}`);
+    showToast('All settings locked', 'success');
+  } catch (err) {
+    showToast('Failed to lock settings', 'error');
+  }
+}
+
+async function resetAllSettings() {
+  showConfirm('Reset Settings', 'Reset all camera settings?', async () => {
+    try {
+      await fetch(`/set_rotation/${currentCamera}/0`);
+      await fetch(`/set_zoom/${currentCamera}/1.0`);
+      await fetch(`/unlock_white_balance/${currentCamera}`);
+      await fetch(`/unlock_exposure/${currentCamera}`);
+      loadCameraSettings();
+      showToast('Settings reset', 'success');
+    } catch (err) {
+      showToast('Failed to reset', 'error');
+    }
+  });
+}
+
+function handleCalibrationClick(event) {
+  if (calibrationComplete) return;  // Prevent adding more points after completion
+  
+  const rect = event.target.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  
+  const scaleX = event.target.naturalWidth / rect.width;
+  const scaleY = event.target.naturalHeight / rect.height;
+  const imageX = x * scaleX;
+  const imageY = y * scaleY;
+  
+  calibrationPoints.push({x: imageX, y: imageY});
+  
+  const marker = document.createElement('div');
+  marker.className = 'calibration-point';
+  marker.style.left = x + 'px';
+  marker.style.top = y + 'px';
+  document.getElementById('calViewport').appendChild(marker);
+  
+  const stepEl = document.getElementById('calStep');
+  if (calibrationPoints.length === 1) {
+    stepEl.innerHTML = 'Step 2: Click <strong>edge of 1" bull ring</strong>';
+  } else if (calibrationPoints.length === 2) {
+    stepEl.innerHTML = 'Step 3: Click <strong>edge of 5" outer ring</strong>';
+  } else if (calibrationPoints.length === 3) {
+    saveCalibration();
+  }
+}
+
+async function saveCalibration() {
+  try {
+    document.getElementById('calStep').innerHTML = '⏳ Saving...';
+    
+    const response = await fetch("/set_calibration", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        camera_id: currentCamera,
+        center: calibrationPoints[0],
+        bull: calibrationPoints[1],
+        outer: calibrationPoints[2]
+      })
+    });
+    
+    const result = await response.json();
+    const quality = result.quality || 0;
+    
+    calibrationComplete = true;
+    document.getElementById('calViewport').classList.add('disabled');
+    document.getElementById('calStep').className = 'calibration-complete';
+    document.getElementById('calStep').innerHTML = '✅ Calibration complete! (Click Reset to recalibrate)';
+    
+    const badge = document.getElementById('qualityBadge');
+    badge.className = `quality-badge quality-${quality >= 0.75 ? 'good' : 'poor'}`;
+    badge.textContent = `Quality: ${quality.toFixed(2)}`;
+    
+    showToast(`Calibrated (Quality: ${quality.toFixed(2)})`, quality >= 0.75 ? 'success' : 'warning');
+  } catch (err) {
+    document.getElementById('calStep').innerHTML = '<span style="color: #f44;">❌ Failed - try again</span>';
+    showToast('Calibration failed', 'error');
+  }
+}
+
+function resetCalibration() {
+  calibrationPoints = [];
+  calibrationComplete = false;
+  document.getElementById('calViewport').classList.remove('disabled');
+  document.querySelectorAll('.calibration-point').forEach(m => m.remove());
+  document.getElementById('calStep').className = 'calibration-step';
+  document.getElementById('calStep').innerHTML = 'Step 1: Click <strong>center of bull hole</strong>';
+  document.getElementById('qualityBadge').textContent = '';
+}
+
+async function testCalibration() {
+  showAlert('Test Calibration', 'Calibration active. Return to Main page and shoot a test round to verify accuracy.', 'info');
+}
+</script>
+
+</body>
+</html>

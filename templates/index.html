@@ -3,78 +3,225 @@
 <head>
   <title>Target Scoring System</title>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/modal-theme.css">
+  <style>
+    body { margin: 0; padding: 0; background: #0a0a0a; color: #f0f0f0; font-family: 'Segoe UI', sans-serif; }
+    .nav-bar { background: #000; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; }
+    .nav-btn { background: #222; color: #fff; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 700; border: 1px solid #444; margin-left: 10px; transition: all 0.2s; }
+    .nav-btn:hover { background: #333; }
+    .nav-btn.active { background: #c5a000; color: #000; border-color: #c5a000; }
+    
+    .camera-grid { display: grid; gap: 20px; padding: 20px; }
+    .grid-1 { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    
+    .camera-lane { background: #161616; border: 2px solid #333; border-radius: 12px; padding: 15px; }
+    .lane-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #333; }
+    .lane-title { font-size: 16px; font-weight: 700; color: #c5a000; }
+    
+    .lane-status { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; padding: 8px; background: #0a0a0a; border-radius: 6px; font-size: 11px; }
+    .status-item { display: flex; align-items: center; gap: 4px; }
+    .status-label { color: #666; text-transform: uppercase; }
+    .status-value { color: #c5a000; font-weight: 700; }
+    .status-indicator { width: 8px; height: 8px; border-radius: 50%; background: #666; }
+    .status-indicator.active { background: #4CAF50; box-shadow: 0 0 8px #4CAF50; }
+    
+    .video-container { aspect-ratio: 4/3; background: #000; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+    .video-feed { width: 100%; height: 100%; object-fit: contain; }
+    
+    .score-section { background: #0a0a0a; padding: 10px; border-radius: 6px; }
+    .score-total { font-size: 32px; font-weight: 700; color: #c5a000; text-align: center; margin-bottom: 8px; }
+    .shot-log { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; min-height: 40px; }
+    .shot-badge { width: 35px; height: 35px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; border: 2px solid; }
+    .shot-5 { background: #1a4d1a; color: #4f8; border-color: #4f8; }
+    .shot-4 { background: #1a3d4d; color: #4af; border-color: #4af; }
+    .shot-3 { background: #4d3d1a; color: #fa4; border-color: #fa4; }
+    .shot-2 { background: #4d2d1a; color: #f84; border-color: #f84; }
+    .shot-1 { background: #3d1a1a; color: #f66; border-color: #f66; }
+    .shot-0 { background: #1a1a1a; color: #666; border-color: #666; }
+    
+    .global-controls { background: #161616; border: 2px solid #333; border-radius: 12px; padding: 15px 20px; margin: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .control-group { display: flex; gap: 10px; align-items: center; }
+    .btn { padding: 10px 20px; font-size: 14px; font-weight: 700; border-radius: 6px; border: none; cursor: pointer; transition: all 0.2s; }
+    .btn-gold { background: #c5a000; color: #000; }
+    .btn-gold:hover { background: #d4af00; }
+    .btn-red { background: #f44336; color: #fff; }
+    .btn-red:hover { background: #da190b; }
+    .btn-secondary { background: #222; color: #fff; border: 1px solid #444; }
+    .btn-secondary:hover { background: #333; }
+    .btn-secondary.active { background: #4CAF50; border-color: #4CAF50; }
+    .btn-secondary:disabled { background: #111; color: #444; border-color: #222; cursor: not-allowed; }
+  </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>🎯 Electronic Target Scoring</h1>
+<div class="nav-bar">
+  <div><h2 style="margin: 0; color: #c5a000;">🎯 Target Scoring</h2></div>
   <div>
-    <button class="btn btn-gold" onclick="toggle()">Start / Stop</button>
-    <button class="btn btn-red" onclick="reset()">Reset</button>
-	<button class="btn btn-gold" onclick="fetch('/toggle_heatmap')">
-  Heatmap
-</button>
-<a href="/spectator" class="btn">Spectator</a>
-<a href="/calibrate" class="btn">Calibrate</a>
+    <a href="/" class="nav-btn active">🏠 Main</a>
+    <a href="/camera" class="nav-btn">📹 Camera</a>
+    <a href="/settings" class="nav-btn">⚙️ Settings</a>
+    <a href="/rounds" class="nav-btn">📂 Rounds</a>
+    <a href="/spectator_fullscreen" class="nav-btn">👥 Spectator</a>
+    <a href="/help" class="nav-btn">❓ Help</a>
   </div>
 </div>
 
-<div class="main">
-
-  <!-- CAMERA -->
-  <div class="panel">
-    <div class="panel-title">Live Target Feed</div>
-    <div class="viewport">
-      <img src="/video/0">
-    </div>
-    <div id="status" class="status inactive">Detection stopped</div>
+<div class="global-controls">
+  <div class="control-group">
+    <button class="btn btn-gold" onclick="toggleAllDetection()">
+      <span id="globalToggleText">Start All Cameras</span>
+    </button>
+    <button class="btn btn-red" onclick="resetAll()">Reset All</button>
+    <button class="btn btn-secondary" id="heatmapBtn" onclick="toggleHeatmap()">Heatmap</button>
   </div>
-
-  <!-- SCORE -->
-  <div class="panel score-box">
-    <div class="panel-title">Scoring</div>
-
-    <div id="total" class="score-total">0</div>
-
-    <div id="hits" class="hit-log"></div>
+  <div class="control-group">
+    <span style="color: #888; font-size: 12px;">Scoring:</span>
+    <span id="scoringModeGlobal" style="color: #c5a000; font-weight: 700;">4-Ring</span>
   </div>
-
 </div>
 
+<div class="camera-grid" id="cameraGrid"></div>
+
+<script src="/static/modal-theme.js"></script>
 <script>
-async function toggle() {
-  const r = await fetch("/toggle");
-  const j = await r.json();
-  const s = document.getElementById("status");
-  s.textContent = j.active ? "Detection running" : "Detection stopped";
-  s.className = "status " + (j.active ? "active" : "inactive");
+let enabledCameras = [], allCameras = [];
+
+window.onload = function() {
+  initSystem();
+  setInterval(updateAllScores, 500);
+  setInterval(updateHeatmapStatus, 1000);
+};
+
+async function initSystem() {
+  try {
+    const response = await fetch('/camera_urls');
+    const data = await response.json();
+    allCameras = data.cameras;
+    enabledCameras = allCameras.map(c => c.camera_id);
+    
+    const scoreResponse = await fetch('/get_scoring_config');
+    const scoreData = await scoreResponse.json();
+    const mode = (scoreData.use_4_ring ? '4-Ring' : '3-Ring') + (scoreData.enable_bull_hole_bonus ? ' +BH' : '');
+    document.getElementById('scoringModeGlobal').textContent = mode;
+    
+    renderCameraGrid();
+    updateHeatmapStatus();
+  } catch (err) {
+    showToast('Failed to initialize system', 'error');
+  }
 }
 
-async function reset() {
-  await fetch("/reset");
-  document.getElementById("hits").innerHTML = "";
-  document.getElementById("total").textContent = "0";
-}
-
-async function refreshHits() {
-  const r = await fetch("/hits");
-  const hits = await r.json();
-
-  const log = document.getElementById("hits");
-  log.innerHTML = "";
-
-  let total = 0;
-  hits.forEach(h => {
-    const s = document.createElement("span");
-    s.textContent = h.score;
-    log.appendChild(s);
-    total += h.score;
+function renderCameraGrid() {
+  const grid = document.getElementById('cameraGrid');
+  grid.innerHTML = '';
+  grid.className = 'camera-grid grid-' + allCameras.length;
+  
+  allCameras.forEach(camera => {
+    const lane = document.createElement('div');
+    lane.className = 'camera-lane';
+    const displayNum = camera.display_num || (camera.camera_id + 1);
+    lane.innerHTML = `
+      <div class="lane-header">
+        <div class="lane-title">Camera ${displayNum} - ${camera.lane}</div>
+      </div>
+      <div class="lane-status">
+        <div class="status-item">
+          <div class="status-indicator" id="det-${camera.camera_id}"></div>
+          <span class="status-label">Detection:</span>
+          <span class="status-value" id="det-status-${camera.camera_id}">Stopped</span>
+        </div>
+      </div>
+      <div class="video-container">
+        <img class="video-feed" src="/video/${camera.camera_id}">
+      </div>
+      <div class="score-section">
+        <div class="score-total" id="total-${camera.camera_id}">0</div>
+        <div class="shot-log" id="shots-${camera.camera_id}"></div>
+      </div>
+    `;
+    grid.appendChild(lane);
   });
-
-  document.getElementById("total").textContent = total;
 }
 
-setInterval(refreshHits, 500);
+async function toggleAllDetection() {
+  const response = await fetch('/toggle');
+  const data = await response.json();
+  
+  enabledCameras.forEach(camId => {
+    const indicator = document.getElementById(`det-${camId}`);
+    const statusText = document.getElementById(`det-status-${camId}`);
+    if (indicator) indicator.classList.toggle('active', data.active);
+    if (statusText) statusText.textContent = data.active ? 'Running' : 'Stopped';
+  });
+  
+  document.getElementById('globalToggleText').textContent = data.active ? 'Stop All Cameras' : 'Start All Cameras';
+  showToast(data.active ? 'Detection started' : 'Detection stopped', 'success');
+}
+
+async function resetAll() {
+  showConfirm('Reset All', 'Reset all cameras and start new round?', async () => {
+    await fetch('/reset');
+    enabledCameras.forEach(camId => {
+      document.getElementById(`shots-${camId}`).innerHTML = '';
+      document.getElementById(`total-${camId}`).textContent = '0';
+    });
+    showToast('All cameras reset', 'success');
+  });
+}
+
+async function toggleHeatmap() {
+  try {
+    await fetch('/toggle_heatmap');
+    setTimeout(updateHeatmapStatus, 200);
+  } catch (err) {
+    showToast('Failed to toggle heatmap', 'error');
+  }
+}
+
+async function updateHeatmapStatus() {
+  try {
+    const response = await fetch('/heatmap_status');
+    const data = await response.json();
+    const btn = document.getElementById('heatmapBtn');
+    
+    if (data.enabled) {
+      btn.classList.add('active');
+      btn.disabled = false;
+    } else {
+      btn.classList.remove('active');
+      btn.disabled = !data.has_data;
+    }
+  } catch (err) {
+    console.error('Failed to get heatmap status');
+  }
+}
+
+async function updateAllScores() {
+  enabledCameras.forEach(async camId => {
+    try {
+      const response = await fetch(`/hits/${camId}`);
+      const hits = await response.json();
+      
+      const shotsContainer = document.getElementById(`shots-${camId}`);
+      const totalDisplay = document.getElementById(`total-${camId}`);
+      if (!shotsContainer || !totalDisplay) return;
+      
+      shotsContainer.innerHTML = '';
+      const total = hits.reduce((sum, hit) => sum + hit.score, 0);
+      
+      hits.forEach(hit => {
+        const badge = document.createElement('div');
+        badge.className = `shot-badge shot-${Math.floor(hit.score)}`;
+        badge.textContent = hit.score;
+        shotsContainer.appendChild(badge);
+      });
+      
+      totalDisplay.textContent = total > 0 ? total.toString() : '0';
+    } catch (err) {}
+  });
+}
 </script>
 
 </body>
