@@ -9,7 +9,10 @@ sudo apt install -y \
     python3-rpi.gpio \
     python3-venv \
     python3-opencv \
-    libatlas-base-dev
+    python3-rpi.gpio \
+    libatlas-base-dev \
+    v4l-utils
+
 
 echo "🐍 Creating virtual environment..."
 python3 -m venv venv --system-site-packages
@@ -19,6 +22,12 @@ source venv/bin/activate
 pip install --upgrade pip
 pip install flask numpy scipy
 pip3 -install python3-opencv
+
+mkdir certs
+mkdir shots
+cd certs
+openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes   -keyout raspberrypi.key -out raspberrypi.crt   -subj "/CN=raspberrypi"   -addext "subjectAltName=DNS:raspberrypi,DNS:raspberrypi.local,IP:192.168.0.84"
+cd ..
 
 echo "✅ Setup complete"
 

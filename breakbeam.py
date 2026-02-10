@@ -24,6 +24,12 @@ def watch_breakbeam():
     if not GPIO_AVAILABLE:
         return  # silently do nothing
 
+    # Setup GPIO before using it
+    try:
+        setup_gpio()
+    except RuntimeError as e:
+        print(f"⚠️ GPIO already configured: {e}")
+    
     print("👁️ Break-beam watcher running")
 
     try:
