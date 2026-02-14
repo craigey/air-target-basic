@@ -28,7 +28,8 @@
     .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
     .btn-small { padding: 8px 16px; font-size: 13px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: 700; transition: all 0.2s; }
     .btn-small:hover { background: #333; }
-    .btn-small.active { background: #4CAF50; border-color: #4CAF50; color: #fff; }
+    .btn-small.active { background: #4CAF50; border-color: #4CAF50; color: #fff; box-shadow: 0 0 10px rgba(76, 175, 80, 0.5); }
+    .btn-small.inactive { background: #f44336; border-color: #f44336; color: #fff; box-shadow: 0 0 10px rgba(244, 67, 54, 0.5); }
     .btn-small.locked { background: #f44336; border-color: #f44336; }
     .btn-primary { background: #4CAF50; border-color: #4CAF50; }
     .btn-primary:hover { background: #45a049; }
@@ -66,21 +67,14 @@
   
   <div class="section">
     <div class="section-header">📹 Select Camera</div>
-   <div class="form-group">
-      <label class="form-label">Focus</label>
-      <div class="btn-group">
-        <button class="btn-small" id="focusAutoBtn" onclick="toggleAutoFocus()">Auto Focus</button>
-      </div>
-      <div id="manualFocusGroup" class="slider-group" style="display: none; margin-top: 10px;">
-        <input type="range" id="focusSlider" class="slider" min="0" max="255" value="0" oninput="setFocus(this.value)">
-        <div class="value-display">
-          <span id="focusValue">0</span>
-          <small>Range: <span id="focusMin">0</span>-<span id="focusMax">255</span></small>
-          <small style="display: block;">Default: <span id="focusDefault">0</span></small>
-        </div>
-      </div>
-      <div class="form-help">Auto-focus recommended for best results. Disable only if you need manual control.</div>
+    <div class="form-group">
+      <label class="form-label">Camera Selection</label>
+      <select id="cameraSelect" class="slider" onchange="changeCamera()">
+        <!-- Populated dynamically -->
+      </select>
+      <div class="form-help">Select which camera to configure</div>
     </div>
+  </div>
 
   <div class="section">
     <div class="section-header">📺 Live Preview</div>
@@ -239,12 +233,14 @@
   <div class="section">
     <div class="section-header">⚡ Quick Actions</div>
     <div class="btn-group">
-      <button class="btn-small btn-primary" onclick="loadCameraControls()">🔄 Refresh Values</button>
-      <button class="btn-small" onclick="resetCameraToDefaults()">↺ Reset to Factory Defaults</button>
+      <button class="btn-small btn-primary" onclick="loadCameraControls()">🔄 Refresh Current Values</button>
+      <button class="btn-small btn-primary" onclick="restoreStartupSettings()">✨ Restore Startup Settings</button>
+      <button class="btn-small" onclick="resetCameraToDefaults()">↺ Reset to Defaults</button>
       <button class="btn-small btn-primary" onclick="lockAllSettings()">🔒 Lock All Settings</button>
     </div>
     <div class="form-help">
-      <strong>Reset to Factory Defaults:</strong> Uses the camera's actual default values (not hardcoded zeros).<br>
+      <strong>Restore Startup Settings:</strong> Optimizes camera settings (brightness to middle, contrast to 75% of max, gain to 0, auto-focus ON).<br>
+      <strong>Reset to Defaults:</strong> Same as Restore Startup Settings.<br>
       <strong>Lock All:</strong> Locks exposure and white balance to prevent auto-adjustments.
     </div>
   </div>
@@ -291,11 +287,26 @@ window.onload = function() {
 async function initCameras() {
   try {
     const response = await fetch('/camera_urls');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
     const data = await response.json();
-    allCameras = data.cameras;
+    allCameras = data.cameras || [];
     
     const select = document.getElementById('cameraSelect');
+    if (!select) {
+      console.warn('Camera select element not found');
+      return;
+    }
+    
     select.innerHTML = '';
+    
+    if (allCameras.length === 0) {
+      // No cameras configured, use default
+      allCameras = [{camera_id: 0, lane: 'Lane 1'}];
+    }
+    
     allCameras.forEach(cam => {
       const option = document.createElement('option');
       const camNum = cam.camera_id + 1;
@@ -309,7 +320,16 @@ async function initCameras() {
       changeCamera();
     }
   } catch (err) {
-    showToast('Failed to load cameras', 'error');
+    console.error('Failed to load cameras:', err);
+    // Don't show toast - it's annoying and cameras still work
+    // Use fallback to camera 0
+    allCameras = [{camera_id: 0, lane: 'Lane 1'}];
+    currentCamera = 0;
+    
+    const select = document.getElementById('cameraSelect');
+    if (select) {
+      select.innerHTML = '<option value="0">Camera 1</option>';
+    }
   }
 }
 
@@ -416,36 +436,49 @@ async function loadCameraControls() {
     updateSlider('sharpnessSlider', 'sharpnessValue', 'sharpnessDefault', controls.sharpness);
     updateSlider('gainSlider', 'gainValue', 'gainDefault', controls.gain);
     
-    // FIX: Initialize auto-focus button state correctly
-    const focusAutoControl = controls.focus_auto || controls.focus_automatic_continuous;
-    if (focusAutoControl && focusAutoControl.value === 1) {
-      // Auto-focus is enabled
-      document.getElementById('focusAutoBtn').classList.add('active');
-      autoFocusEnabled = true;
-      document.getElementById('manualFocusGroup').style.display = 'none';
-    } else {
-      // Manual focus mode
-      document.getElementById('focusAutoBtn').classList.remove('active');
-      autoFocusEnabled = false;
-      document.getElementById('manualFocusGroup').style.display = 'flex';
-      
-      // Set focus slider range from actual camera capabilities
-      if (controls.focus_absolute && controls.focus_absolute.supported) {
-        const focusSlider = document.getElementById('focusSlider');
-        if (focusSlider) {
-          focusSlider.min = controls.focus_absolute.min;
-          focusSlider.max = controls.focus_absolute.max;
-          focusSlider.value = controls.focus_absolute.value;
+    // Initialize auto-focus button state from camera using detected control name
+    const focusControlName = controls._focus_control_name;
+    let focusAutoEnabled = false;
+    
+    if (focusControlName && controls[focusControlName]) {
+      focusAutoEnabled = controls[focusControlName].value === 1;
+    }
+    
+    const focusBtn = document.getElementById('focusAutoBtn');
+    if (focusBtn) {
+      if (focusAutoEnabled) {
+        // Auto-focus is ON - button should be GREEN
+        focusBtn.classList.add('active');
+        focusBtn.classList.remove('inactive');
+        autoFocusEnabled = true;
+        document.getElementById('manualFocusGroup').style.display = 'none';
+      } else {
+        // Auto-focus is OFF - button should be RED
+        focusBtn.classList.remove('active');
+        focusBtn.classList.add('inactive');
+        autoFocusEnabled = false;
+        document.getElementById('manualFocusGroup').style.display = 'flex';
+        
+        // Set focus slider range from actual camera capabilities
+        if (controls.focus_absolute) {
+          const focusSlider = document.getElementById('focusSlider');
+          if (focusSlider) {
+            focusSlider.min = controls.focus_absolute.min;
+            focusSlider.max = controls.focus_absolute.max;
+            focusSlider.value = controls.focus_absolute.value;
+          }
+          
+          const focusValue = document.getElementById('focusValue');
+          if (focusValue) focusValue.textContent = controls.focus_absolute.value;
+          
+          // Update focus range display
+          const focusMin = document.getElementById('focusMin');
+          const focusMax = document.getElementById('focusMax');
+          const focusDefault = document.getElementById('focusDefault');
+          if (focusMin) focusMin.textContent = controls.focus_absolute.min;
+          if (focusMax) focusMax.textContent = controls.focus_absolute.max;
+          if (focusDefault) focusDefault.textContent = controls.focus_absolute.default;
         }
-        
-        const focusValue = document.getElementById('focusValue');
-        if (focusValue) focusValue.textContent = controls.focus_absolute.value;
-        
-        // Update focus range display if you have these elements
-        const focusMin = document.getElementById('focusMin');
-        const focusMax = document.getElementById('focusMax');
-        if (focusMin) focusMin.textContent = controls.focus_absolute.min;
-        if (focusMax) focusMax.textContent = controls.focus_absolute.max;
       }
     }
     
@@ -564,18 +597,36 @@ async function toggleAutoFocus() {
   const manualGroup = document.getElementById('manualFocusGroup');
   
   try {
-    await fetch(`/set_focus_auto/${currentCamera}/${autoFocusEnabled ? 1 : 0}`);
+    const response = await fetch(`/set_focus_auto/${currentCamera}/${autoFocusEnabled ? 1 : 0}`);
+    const result = await response.json();
     
-    if (autoFocusEnabled) {
-      btn.classList.add('active');
-      manualGroup.style.display = 'none';
-      showToast('Auto-focus enabled', 'success');
+    if (result.success) {
+      if (autoFocusEnabled) {
+        // Auto-focus ON - GREEN button
+        btn.classList.add('active');
+        btn.classList.remove('inactive');
+        manualGroup.style.display = 'none';
+        showToast('Auto-focus enabled', 'success');
+      } else {
+        // Auto-focus OFF - RED button
+        btn.classList.remove('active');
+        btn.classList.add('inactive');
+        manualGroup.style.display = 'flex';
+        
+        // Reload controls to get updated focus slider range
+        loadCameraControls();
+        
+        showToast('Manual focus enabled', 'success');
+      }
     } else {
-      btn.classList.remove('active');
-      manualGroup.style.display = 'flex';
-      showToast('Manual focus enabled', 'success');
+      // API call failed, revert state
+      autoFocusEnabled = !autoFocusEnabled;
+      showToast(result.error || 'Failed to toggle auto-focus', 'error');
     }
   } catch (err) {
+    // Network error, revert state
+    autoFocusEnabled = !autoFocusEnabled;
+    console.error('Auto-focus toggle error:', err);
     showToast('Failed to toggle auto-focus', 'error');
   }
 }
@@ -617,7 +668,7 @@ async function setPowerLineFreq(value) {
 }
 
 async function resetCameraToDefaults() {
-  showConfirm('Reset to Factory Defaults', 'Reset all camera controls to factory defaults? This uses the camera\'s actual default values.', async () => {
+  showConfirm('Reset to Defaults', 'Reset all camera controls to startup-optimized values? This will restore brightness, contrast, and gain to the values used when the app starts.', async () => {
     try {
       const response = await fetch(`/reset_camera_controls/${currentCamera}`);
       const data = await response.json();
@@ -630,6 +681,24 @@ async function resetCameraToDefaults() {
       }
     } catch (err) {
       showToast('Failed to reset controls', 'error');
+    }
+  });
+}
+
+async function restoreStartupSettings() {
+  showConfirm('Restore Startup Settings', 'Restore camera to optimized settings?<br><br>This will:<br>• Set brightness to middle of range<br>• Set contrast to 75% of max<br>• Set gain to 0<br>• Enable auto-focus', async () => {
+    try {
+      const response = await fetch(`/optimize_camera/${currentCamera}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setTimeout(loadCameraControls, 500);
+        showToast('Camera settings optimized!', 'success');
+      } else {
+        showToast('Failed to optimize settings', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to optimize settings', 'error');
     }
   });
 }
