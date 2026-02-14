@@ -20,7 +20,7 @@
     .form-help { font-size: 11px; color: #888; margin-top: 5px; }
     
     input[type="checkbox"] { width: 18px; height: 18px; margin-right: 8px; cursor: pointer; }
-    input[type="text"] { background: #000; color: #c5a000; border: 1px solid #444; padding: 10px 12px; border-radius: 4px; font-weight: 700; font-size: 14px; width: 100%; max-width: 600px; }
+    input[type="text"], input[type="number"] { background: #000; color: #c5a000; border: 1px solid #444; padding: 10px 12px; border-radius: 4px; font-weight: 700; font-size: 14px; width: 100%; max-width: 600px; }
     select { background: #000; color: #c5a000; border: 1px solid #444; padding: 8px 12px; border-radius: 4px; font-weight: 700; font-size: 14px; }
     
     .btn-small { padding: 8px 16px; font-size: 13px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: 700; margin-top: 10px; }
@@ -30,6 +30,8 @@
     
     .info-box { background: #0a0a0a; padding: 12px; border-radius: 6px; border: 1px solid #444; margin-top: 10px; }
     code { color: #c5a000; background: #000; padding: 2px 6px; border-radius: 3px; }
+    .slider { width: 100%; max-width: 400px; }
+    .value-display { font-size: 16px; color: #c5a000; font-weight: 700; margin: 5px 0; }
   </style>
 </head>
 <body>
@@ -48,7 +50,6 @@
 
 <div class="container">
 
-  <!-- Match Settings -->
   <div class="section">
     <div class="section-header">🎯 Match Settings</div>
     
@@ -78,11 +79,9 @@
         <option value="6" selected>6 Shots</option>
         <option value="10">10 Shots</option>
       </select>
-      <div class="form-help">Number of shots in a complete round</div>
     </div>
   </div>
 
-  <!-- Recording Settings -->
   <div class="section">
     <div class="section-header">📸 Shot Recording</div>
     
@@ -109,7 +108,6 @@
         <option value="200" selected>200x200 (Medium)</option>
         <option value="300">300x300 (Large)</option>
       </select>
-      <div class="form-help">Size of cropped shot images</div>
     </div>
 
     <div class="form-group">
@@ -117,21 +115,50 @@
       <input type="text" id="shotDirectory" placeholder="/home/admin/air-target/shots">
       <button class="btn-small btn-primary" onclick="saveShotDirectory()">Save Directory</button>
       <div class="form-help">
-        Location where shot images and rounds are saved. Directory will be created if it doesn't exist.
+        Location where shot images and rounds are saved.
       </div>
       <div class="info-box" style="margin-top: 10px;">
         <div style="font-size: 12px; color: #888; margin-bottom: 5px;">Current Directory:</div>
         <code id="currentShotDir">/home/admin/air-target/shots</code>
-        <div style="font-size: 11px; color: #666; margin-top: 5px;">
-          Total rounds: <span id="totalRounds">-</span>
-        </div>
       </div>
     </div>
   </div>
 
-  <!-- Advanced Settings -->
   <div class="section">
-    <div class="section-header">🔧 Advanced Detection</div>
+    <div class="section-header">🎥 Detection Performance</div>
+    
+    <div class="form-group">
+      <label class="form-label">Detection Framerate (FPS)</label>
+      <select id="detectionFPS" onchange="saveDetectionFPS()">
+        <option value="30">30 FPS - Full Speed (High CPU)</option>
+        <option value="15">15 FPS - Half Speed</option>
+        <option value="10">10 FPS - Recommended</option>
+        <option value="5" selected>5 FPS - Low CPU (Recommended)</option>
+        <option value="3">3 FPS - Very Low CPU</option>
+        <option value="1">1 FPS - Minimum</option>
+      </select>
+      <div class="form-help">
+        <strong>IMPORTANT:</strong> Lower framerate reduces CPU usage without affecting live video.<br>
+        <strong>5 FPS (1 frame every 0.2 seconds) is recommended for pellet detection.</strong><br>
+        Live video always displays at full camera framerate (30 FPS).
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Shot Cooldown (frames)</label>
+      <input type="number" id="shotCooldown" min="0" max="30" value="9" onchange="saveAdvancedConfig()" style="width: 100px;">
+      <div class="form-help">Number of frames to skip after detecting a shot (prevents duplicates)</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Max Shot Interval (seconds)</label>
+      <input type="number" id="maxShotInterval" min="10" max="300" value="120" onchange="saveAdvancedConfig()" style="width: 100px;">
+      <div class="form-help">Maximum time between shots before baseline resets</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">🔧 Detection Algorithm</div>
     
     <div class="form-group">
       <label class="form-label">
@@ -151,17 +178,55 @@
 
     <div class="form-group">
       <label class="form-label">Minimum Confidence</label>
-      <input type="range" id="minConfidence" min="0.3" max="0.9" step="0.05" value="0.6" oninput="updateConfidenceValue(this.value)" onchange="saveAdvancedConfig()">
-      <div class="value-display" style="font-size: 16px; color: #c5a000; font-weight: 700; margin: 5px 0;">
+      <input type="range" id="minConfidence" class="slider" min="0.3" max="0.9" step="0.05" value="0.6" oninput="updateConfidenceValue(this.value)" onchange="saveAdvancedConfig()">
+      <div class="value-display">
         <span id="confidenceValue">0.6</span>
       </div>
       <div class="form-help">Minimum AI confidence required to register a shot (higher = fewer false positives)</div>
     </div>
 
     <div class="form-group">
-      <label class="form-label">Shot Cooldown (frames)</label>
-      <input type="number" id="shotCooldown" min="0" max="30" value="9" onchange="saveAdvancedConfig()" style="width: 100px;">
-      <div class="form-help">Number of frames to skip after detecting a shot (prevents duplicates)</div>
+      <label class="form-label">Minimum Shot Area (pixels)</label>
+      <input type="number" id="minArea" min="10" max="200" value="40" onchange="saveAdvancedConfig()" style="width: 100px;">
+      <div class="form-help">Minimum size of pellet mark to detect</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Maximum Shot Area (pixels)</label>
+      <input type="number" id="maxArea" min="200" max="1000" value="400" onchange="saveAdvancedConfig()" style="width: 100px;">
+      <div class="form-help">Maximum size of pellet mark to detect</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Baseline Update Mode</label>
+      <select id="baselineMode" onchange="saveAdvancedConfig()">
+        <option value="selective">Selective (Recommended)</option>
+        <option value="continuous">Continuous</option>
+        <option value="static">Static</option>
+      </select>
+      <div class="form-help">How baseline image updates: selective (after each shot), continuous (always), static (never)</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">🎨 Camera Zoom Limits</div>
+    
+    <div class="form-group">
+      <label class="form-label">Minimum Zoom</label>
+      <input type="number" id="minZoom" min="1.0" max="2.0" step="0.1" value="1.0" onchange="saveZoomConfig()" style="width: 100px;">
+      <div class="form-help">Minimum zoom level (1.0 = no zoom)</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Maximum Zoom</label>
+      <input type="number" id="maxZoom" min="2.0" max="8.0" step="0.5" value="4.0" onchange="saveZoomConfig()" style="width: 100px;">
+      <div class="form-help">Maximum zoom level</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Zoom Step</label>
+      <input type="number" id="zoomStep" min="0.05" max="0.5" step="0.05" value="0.1" onchange="saveZoomConfig()" style="width: 100px;">
+      <div class="form-help">Zoom adjustment increment</div>
     </div>
   </div>
 
@@ -177,7 +242,6 @@ async function loadAllSettings() {
   try {
     const scoreResponse = await fetch('/get_scoring_config');
     const scoreData = await scoreResponse.json();
-    
     document.getElementById('use4Ring').checked = scoreData.use_4_ring;
     document.getElementById('bullHoleBonus').checked = scoreData.enable_bull_hole_bonus;
     document.getElementById('shotsPerRound').value = scoreData.shots_per_round || 6;
@@ -191,11 +255,21 @@ async function loadAllSettings() {
     document.getElementById('shotDirectory').value = config.shot_directory || '/home/admin/air-target/shots';
     document.getElementById('currentShotDir').textContent = config.shot_directory || '/home/admin/air-target/shots';
     
+    document.getElementById('detectionFPS').value = config.detection_fps || 5;
+    document.getElementById('shotCooldown').value = config.shot_cooldown_frames || 9;
+    document.getElementById('maxShotInterval').value = config.max_shot_interval_seconds || 120;
+    
     document.getElementById('adaptiveThreshold').checked = config.adaptive_threshold;
     document.getElementById('colorDetection').checked = config.color_detection;
     document.getElementById('minConfidence').value = config.min_confidence || 0.6;
     document.getElementById('confidenceValue').textContent = config.min_confidence || 0.6;
-    document.getElementById('shotCooldown').value = config.shot_cooldown_frames || 9;
+    document.getElementById('minArea').value = config.min_area || 40;
+    document.getElementById('maxArea').value = config.max_area || 400;
+    document.getElementById('baselineMode').value = config.baseline_update_mode || 'selective';
+    
+    document.getElementById('minZoom').value = config.min_zoom || 1.0;
+    document.getElementById('maxZoom').value = config.max_zoom || 4.0;
+    document.getElementById('zoomStep').value = config.zoom_step || 0.1;
     
   } catch (err) {
     showToast('Failed to load settings', 'error');
@@ -208,7 +282,6 @@ async function saveScoringConfig() {
     enable_bull_hole_bonus: document.getElementById('bullHoleBonus').checked,
     shots_per_round: parseInt(document.getElementById('shotsPerRound').value)
   };
-
   try {
     await fetch('/set_scoring_config', {
       method: 'POST',
@@ -227,7 +300,6 @@ async function saveRecordingConfig() {
     record_full_frame: document.getElementById('recordFullFrame').checked,
     crop_size: parseInt(document.getElementById('cropSize').value)
   };
-
   try {
     await fetch('/set_recording_config', {
       method: 'POST',
@@ -242,21 +314,17 @@ async function saveRecordingConfig() {
 
 async function saveShotDirectory() {
   const directory = document.getElementById('shotDirectory').value.trim();
-  
   if (!directory) {
     showToast('Please enter a directory path', 'warning');
     return;
   }
-
   try {
     const response = await fetch('/set_shot_directory', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ directory: directory })
     });
-    
     const result = await response.json();
-    
     if (result.success) {
       document.getElementById('currentShotDir').textContent = directory;
       showToast('Shot directory updated', 'success');
@@ -268,14 +336,27 @@ async function saveShotDirectory() {
   }
 }
 
+async function saveDetectionFPS() {
+  const fps = parseInt(document.getElementById('detectionFPS').value);
+  try {
+    await fetch(`/set_detection_fps/${fps}`);
+    showToast(`Detection framerate set to ${fps} FPS`, 'success');
+  } catch (err) {
+    showToast('Failed to save detection framerate', 'error');
+  }
+}
+
 async function saveAdvancedConfig() {
   const config = {
     adaptive_threshold: document.getElementById('adaptiveThreshold').checked,
     color_detection: document.getElementById('colorDetection').checked,
     min_confidence: parseFloat(document.getElementById('minConfidence').value),
-    shot_cooldown_frames: parseInt(document.getElementById('shotCooldown').value)
+    shot_cooldown_frames: parseInt(document.getElementById('shotCooldown').value),
+    max_shot_interval_seconds: parseInt(document.getElementById('maxShotInterval').value),
+    min_area: parseInt(document.getElementById('minArea').value),
+    max_area: parseInt(document.getElementById('maxArea').value),
+    baseline_update_mode: document.getElementById('baselineMode').value
   };
-
   try {
     await fetch('/set_advanced_config', {
       method: 'POST',
@@ -285,6 +366,24 @@ async function saveAdvancedConfig() {
     showToast('Advanced settings saved', 'success');
   } catch (err) {
     showToast('Failed to save advanced settings', 'error');
+  }
+}
+
+async function saveZoomConfig() {
+  const config = {
+    min_zoom: parseFloat(document.getElementById('minZoom').value),
+    max_zoom: parseFloat(document.getElementById('maxZoom').value),
+    zoom_step: parseFloat(document.getElementById('zoomStep').value)
+  };
+  try {
+    await fetch('/set_zoom_config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(config)
+    });
+    showToast('Zoom settings saved', 'success');
+  } catch (err) {
+    showToast('Failed to save zoom settings', 'error');
   }
 }
 

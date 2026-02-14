@@ -41,7 +41,7 @@
     .shot-1 { background: #3d1a1a; color: #f66; border-color: #f66; }
     .shot-0 { background: #1a1a1a; color: #666; border-color: #666; }
     
-    .global-controls { background: #161616; border: 2px solid #333; border-radius: 12px; padding: 15px 20px; margin: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .global-controls { background: #161616; border: 2px solid #333; border-radius: 12px; padding: 15px 20px; margin: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
     .control-group { display: flex; gap: 10px; align-items: center; }
     .btn { padding: 10px 20px; font-size: 14px; font-weight: 700; border-radius: 6px; border: none; cursor: pointer; transition: all 0.2s; }
     .btn-gold { background: #c5a000; color: #000; }
@@ -50,7 +50,7 @@
     .btn-red:hover { background: #da190b; }
     .btn-secondary { background: #222; color: #fff; border: 1px solid #444; }
     .btn-secondary:hover { background: #333; }
-    .btn-secondary.active { background: #4CAF50; border-color: #4CAF50; }
+    .btn-secondary.active { background: #4CAF50; border-color: #4CAF50; color: #fff; }
     .btn-secondary:disabled { background: #111; color: #444; border-color: #222; cursor: not-allowed; }
   </style>
 </head>
@@ -76,6 +76,14 @@
     <button class="btn btn-red" onclick="resetAll()">Reset All</button>
     <button class="btn btn-secondary" id="heatmapBtn" onclick="toggleHeatmap()">Heatmap</button>
   </div>
+  
+  <div class="control-group">
+    <span style="color: #888; font-size: 12px;">View:</span>
+    <button class="btn btn-secondary" id="viewModeBtn" onclick="toggleViewMode()">
+      <span id="viewModeText">📹 Full View</span>
+    </button>
+  </div>
+  
   <div class="control-group">
     <span style="color: #888; font-size: 12px;">Scoring:</span>
     <span id="scoringModeGlobal" style="color: #c5a000; font-weight: 700;">4-Ring</span>
@@ -87,6 +95,7 @@
 <script src="/static/modal-theme.js"></script>
 <script>
 let enabledCameras = [], allCameras = [];
+let viewMode = 'full';  // 'full' or 'cropped'
 
 window.onload = function() {
   initSystem();
@@ -109,6 +118,7 @@ async function initSystem() {
     renderCameraGrid();
     updateHeatmapStatus();
   } catch (err) {
+    console.error('Failed to initialize system:', err);
     showToast('Failed to initialize system', 'error');
   }
 }
@@ -122,6 +132,8 @@ function renderCameraGrid() {
     const lane = document.createElement('div');
     lane.className = 'camera-lane';
     const displayNum = camera.display_num || (camera.camera_id + 1);
+    const videoSrc = getVideoSrc(camera.camera_id);
+    
     lane.innerHTML = `
       <div class="lane-header">
         <div class="lane-title">Camera ${displayNum} - ${camera.lane}</div>
@@ -132,9 +144,13 @@ function renderCameraGrid() {
           <span class="status-label">Detection:</span>
           <span class="status-value" id="det-status-${camera.camera_id}">Stopped</span>
         </div>
+        <div class="status-item">
+          <span class="status-label">View:</span>
+          <span class="status-value" id="view-${camera.camera_id}">Full</span>
+        </div>
       </div>
       <div class="video-container">
-        <img class="video-feed" src="/video/${camera.camera_id}">
+        <img class="video-feed" id="feed-${camera.camera_id}" src="${videoSrc}" onerror="handleVideoError(${camera.camera_id})">
       </div>
       <div class="score-section">
         <div class="score-total" id="total-${camera.camera_id}">0</div>
@@ -145,29 +161,80 @@ function renderCameraGrid() {
   });
 }
 
-async function toggleAllDetection() {
-  const response = await fetch('/toggle');
-  const data = await response.json();
+function handleVideoError(camId) {
+  console.error(`Video feed error for camera ${camId}`);
+  const feed = document.getElementById(`feed-${camId}`);
+  if (feed) {
+    feed.alt = `Camera ${camId} - Feed error`;
+  }
+}
+
+function getVideoSrc(camId) {
+  return viewMode === 'full' ? `/video/${camId}` : `/video_cropped/${camId}`;
+}
+
+function toggleViewMode() {
+  viewMode = viewMode === 'full' ? 'cropped' : 'full';
   
+  const btn = document.getElementById('viewModeBtn');
+  const text = document.getElementById('viewModeText');
+  
+  if (viewMode === 'cropped') {
+    text.textContent = '🎯 Cropped View';
+    btn.classList.add('active');
+  } else {
+    text.textContent = '📹 Full View';
+    btn.classList.remove('active');
+  }
+  
+  // Update all video feeds
   enabledCameras.forEach(camId => {
-    const indicator = document.getElementById(`det-${camId}`);
-    const statusText = document.getElementById(`det-status-${camId}`);
-    if (indicator) indicator.classList.toggle('active', data.active);
-    if (statusText) statusText.textContent = data.active ? 'Running' : 'Stopped';
+    const feed = document.getElementById(`feed-${camId}`);
+    const viewStatus = document.getElementById(`view-${camId}`);
+    if (feed) {
+      feed.src = getVideoSrc(camId) + `?t=${Date.now()}`;
+    }
+    if (viewStatus) {
+      viewStatus.textContent = viewMode === 'full' ? 'Full' : 'Cropped';
+    }
   });
   
-  document.getElementById('globalToggleText').textContent = data.active ? 'Stop All Cameras' : 'Start All Cameras';
-  showToast(data.active ? 'Detection started' : 'Detection stopped', 'success');
+  showToast(`View mode: ${viewMode === 'full' ? 'Full Camera' : 'Cropped Target'}`, 'success');
+}
+
+async function toggleAllDetection() {
+  try {
+    const response = await fetch('/toggle');
+    const data = await response.json();
+    
+    enabledCameras.forEach(camId => {
+      const indicator = document.getElementById(`det-${camId}`);
+      const statusText = document.getElementById(`det-status-${camId}`);
+      if (indicator) indicator.classList.toggle('active', data.active);
+      if (statusText) statusText.textContent = data.active ? 'Running' : 'Stopped';
+    });
+    
+    document.getElementById('globalToggleText').textContent = data.active ? 'Stop All Cameras' : 'Start All Cameras';
+    showToast(data.active ? 'Detection started' : 'Detection stopped', 'success');
+  } catch (err) {
+    console.error('Failed to toggle detection:', err);
+    showToast('Failed to toggle detection', 'error');
+  }
 }
 
 async function resetAll() {
   showConfirm('Reset All', 'Reset all cameras and start new round?', async () => {
-    await fetch('/reset');
-    enabledCameras.forEach(camId => {
-      document.getElementById(`shots-${camId}`).innerHTML = '';
-      document.getElementById(`total-${camId}`).textContent = '0';
-    });
-    showToast('All cameras reset', 'success');
+    try {
+      await fetch('/reset');
+      enabledCameras.forEach(camId => {
+        document.getElementById(`shots-${camId}`).innerHTML = '';
+        document.getElementById(`total-${camId}`).textContent = '0';
+      });
+      showToast('All cameras reset', 'success');
+    } catch (err) {
+      console.error('Failed to reset:', err);
+      showToast('Failed to reset', 'error');
+    }
   });
 }
 
@@ -176,6 +243,7 @@ async function toggleHeatmap() {
     await fetch('/toggle_heatmap');
     setTimeout(updateHeatmapStatus, 200);
   } catch (err) {
+    console.error('Failed to toggle heatmap:', err);
     showToast('Failed to toggle heatmap', 'error');
   }
 }
@@ -194,7 +262,7 @@ async function updateHeatmapStatus() {
       btn.disabled = !data.has_data;
     }
   } catch (err) {
-    console.error('Failed to get heatmap status');
+    console.error('Heatmap status error:', err);
   }
 }
 
@@ -219,7 +287,9 @@ async function updateAllScores() {
       });
       
       totalDisplay.textContent = total > 0 ? total.toString() : '0';
-    } catch (err) {}
+    } catch (err) {
+      console.error(`Failed to update scores for camera ${camId}:`, err);
+    }
   });
 }
 </script>

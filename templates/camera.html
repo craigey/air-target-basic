@@ -28,14 +28,15 @@
     .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
     .btn-small { padding: 8px 16px; font-size: 13px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: 700; transition: all 0.2s; }
     .btn-small:hover { background: #333; }
-    .btn-small.active { background: #4CAF50; border-color: #4CAF50; }
+    .btn-small.active { background: #4CAF50; border-color: #4CAF50; color: #fff; }
     .btn-small.locked { background: #f44336; border-color: #f44336; }
     .btn-primary { background: #4CAF50; border-color: #4CAF50; }
     .btn-primary:hover { background: #45a049; }
     
     .slider { width: 100%; max-width: 400px; }
     .slider-group { display: flex; align-items: center; gap: 15px; }
-    .value-display { font-size: 16px; color: #c5a000; font-weight: 700; min-width: 60px; text-align: center; }
+    .value-display { font-size: 16px; color: #c5a000; font-weight: 700; min-width: 80px; text-align: center; }
+    .value-display small { font-size: 11px; color: #888; display: block; }
     
     .calibration-viewport { position: relative; cursor: crosshair; }
     .calibration-viewport.disabled { cursor: not-allowed; pointer-events: none; opacity: 0.6; }
@@ -65,17 +66,21 @@
   
   <div class="section">
     <div class="section-header">📹 Select Camera</div>
-    <div class="form-group">
-      <label class="form-label">Camera</label>
-      <select id="cameraSelect" onchange="changeCamera()"></select>
+   <div class="form-group">
+      <label class="form-label">Focus</label>
+      <div class="btn-group">
+        <button class="btn-small" id="focusAutoBtn" onclick="toggleAutoFocus()">Auto Focus</button>
+      </div>
+      <div id="manualFocusGroup" class="slider-group" style="display: none; margin-top: 10px;">
+        <input type="range" id="focusSlider" class="slider" min="0" max="255" value="0" oninput="setFocus(this.value)">
+        <div class="value-display">
+          <span id="focusValue">0</span>
+          <small>Range: <span id="focusMin">0</span>-<span id="focusMax">255</span></small>
+          <small style="display: block;">Default: <span id="focusDefault">0</span></small>
+        </div>
+      </div>
+      <div class="form-help">Auto-focus recommended for best results. Disable only if you need manual control.</div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Lane Name</label>
-      <input type="text" id="laneName" placeholder="Lane 1" style="width: 200px;">
-      <button class="btn-small btn-primary" onclick="saveLaneName()" style="margin-left: 10px;">Save</button>
-      <div class="form-help">Customize the display name for this lane</div>
-    </div>
-  </div>
 
   <div class="section">
     <div class="section-header">📺 Live Preview</div>
@@ -130,45 +135,56 @@
       <label class="form-label">Brightness</label>
       <div class="slider-group">
         <input type="range" id="brightnessSlider" class="slider" min="-64" max="64" value="0" oninput="setBrightness(this.value)">
-        <div class="value-display"><span id="brightnessValue">0</span></div>
+        <div class="value-display">
+          <span id="brightnessValue">0</span>
+          <small>Default: <span id="brightnessDefault">0</span></small>
+        </div>
       </div>
-      <div class="form-help">Adjust overall image brightness (-64 to 64)</div>
     </div>
 
     <div class="form-group">
       <label class="form-label">Contrast</label>
       <div class="slider-group">
         <input type="range" id="contrastSlider" class="slider" min="0" max="64" value="32" oninput="setContrast(this.value)">
-        <div class="value-display"><span id="contrastValue">32</span></div>
+        <div class="value-display">
+          <span id="contrastValue">32</span>
+          <small>Default: <span id="contrastDefault">32</span></small>
+        </div>
       </div>
-      <div class="form-help">Adjust difference between light and dark (0 to 64)</div>
     </div>
 
     <div class="form-group">
       <label class="form-label">Saturation</label>
       <div class="slider-group">
         <input type="range" id="saturationSlider" class="slider" min="0" max="128" value="64" oninput="setSaturation(this.value)">
-        <div class="value-display"><span id="saturationValue">64</span></div>
+        <div class="value-display">
+          <span id="saturationValue">64</span>
+          <small>Default: <span id="saturationDefault">64</span></small>
+        </div>
       </div>
-      <div class="form-help">Adjust color intensity (0 to 128, 0=grayscale)</div>
     </div>
 
     <div class="form-group">
       <label class="form-label">Sharpness</label>
       <div class="slider-group">
         <input type="range" id="sharpnessSlider" class="slider" min="0" max="255" value="128" oninput="setSharpness(this.value)">
-        <div class="value-display"><span id="sharpnessValue">128</span></div>
+        <div class="value-display">
+          <span id="sharpnessValue">128</span>
+          <small>Default: <span id="sharpnessDefault">128</span></small>
+        </div>
       </div>
-      <div class="form-help">Adjust edge definition (0 to 255)</div>
     </div>
 
     <div class="form-group">
       <label class="form-label">Gain (ISO Sensitivity)</label>
       <div class="slider-group">
         <input type="range" id="gainSlider" class="slider" min="0" max="255" value="0" oninput="setGain(this.value)">
-        <div class="value-display"><span id="gainValue">0</span></div>
+        <div class="value-display">
+          <span id="gainValue">0</span>
+          <small>Default: <span id="gainDefault">0</span></small>
+        </div>
       </div>
-      <div class="form-help">Higher gain = brighter in low light but more noise (0 to 255)</div>
+      <div class="form-help">Higher = brighter in low light but more noise</div>
     </div>
 
     <div class="form-group">
@@ -178,9 +194,12 @@
       </div>
       <div class="slider-group" id="manualFocusGroup" style="display: none; margin-top: 10px;">
         <input type="range" id="focusSlider" class="slider" min="0" max="255" value="0" oninput="setFocus(this.value)">
-        <div class="value-display"><span id="focusValue">0</span></div>
+        <div class="value-display">
+          <span id="focusValue">0</span>
+          <small>Default: <span id="focusDefault">0</span></small>
+        </div>
       </div>
-      <div class="form-help">Auto-focus or manual focus control</div>
+      <div class="form-help">Logitech 925e uses "focus_automatic_continuous"</div>
     </div>
 
     <div class="form-group">
@@ -196,7 +215,6 @@
           <option value="2">60 Hz (USA/Canada)</option>
         </select>
       </div>
-      <div class="form-help">Backlight compensation and flicker reduction</div>
     </div>
   </div>
 
@@ -206,10 +224,10 @@
       <label class="form-label">White Balance</label>
       <div class="btn-group">
         <button class="btn-small" id="wbAutoBtn" onclick="setWBMode('auto')">Auto</button>
-        <button class="btn-small" onclick="setWBTemp(2800)">Tungsten 2800K</button>
-        <button class="btn-small" onclick="setWBTemp(4000)">Fluorescent 4000K</button>
-        <button class="btn-small" onclick="setWBTemp(5500)">Daylight 5500K</button>
-        <button class="btn-small" onclick="setWBTemp(6500)">Cloudy 6500K</button>
+        <button class="btn-small" id="wb2800Btn" onclick="setWBTemp(2800)">Tungsten 2800K</button>
+        <button class="btn-small" id="wb4000Btn" onclick="setWBTemp(4000)">Fluorescent 4000K</button>
+        <button class="btn-small" id="wb5500Btn" onclick="setWBTemp(5500)">Daylight 5500K</button>
+        <button class="btn-small" id="wb6500Btn" onclick="setWBTemp(6500)">Cloudy 6500K</button>
       </div>
     </div>
     <div class="form-group">
@@ -222,9 +240,12 @@
     <div class="section-header">⚡ Quick Actions</div>
     <div class="btn-group">
       <button class="btn-small btn-primary" onclick="loadCameraControls()">🔄 Refresh Values</button>
-      <button class="btn-small" onclick="resetCameraControls()">↺ Reset to Defaults</button>
-      <button class="btn-small btn-primary" onclick="optimizeCamera()">⚙️ Optimize Camera</button>
+      <button class="btn-small" onclick="resetCameraToDefaults()">↺ Reset to Factory Defaults</button>
       <button class="btn-small btn-primary" onclick="lockAllSettings()">🔒 Lock All Settings</button>
+    </div>
+    <div class="form-help">
+      <strong>Reset to Factory Defaults:</strong> Uses the camera's actual default values (not hardcoded zeros).<br>
+      <strong>Lock All:</strong> Locks exposure and white balance to prevent auto-adjustments.
     </div>
   </div>
 
@@ -259,6 +280,7 @@ let calibrationComplete = false;
 let laneNames = {};
 let autoFocusEnabled = true;
 let backlightEnabled = false;
+let cameraDefaults = {};
 
 window.onload = function() {
   initCameras();
@@ -333,6 +355,7 @@ function changeCamera() {
   
   loadCameraSettings();
   loadCameraControls();
+  loadWhiteBalanceStatus();
   calibrationPoints = [];
   calibrationComplete = false;
   document.querySelectorAll('.calibration-point').forEach(p => p.remove());
@@ -365,52 +388,107 @@ async function loadCameraControls() {
     const response = await fetch(`/get_camera_controls/${currentCamera}`);
     const controls = await response.json();
     
-    if (controls.brightness) {
-      document.getElementById('brightnessSlider').min = controls.brightness.min;
-      document.getElementById('brightnessSlider').max = controls.brightness.max;
-      document.getElementById('brightnessSlider').value = controls.brightness.value;
-      document.getElementById('brightnessValue').textContent = controls.brightness.value;
+    // Helper function to safely update sliders
+    function updateSlider(sliderId, valueId, defaultId, controlInfo) {
+      if (!controlInfo || !controlInfo.supported) {
+        console.warn(`Control not supported: ${sliderId}`);
+        return;
+      }
+      
+      const slider = document.getElementById(sliderId);
+      if (slider) {
+        slider.min = controlInfo.min;
+        slider.max = controlInfo.max;
+        slider.value = controlInfo.value;
+      }
+      
+      const valueEl = document.getElementById(valueId);
+      if (valueEl) valueEl.textContent = controlInfo.value;
+      
+      const defaultEl = document.getElementById(defaultId);
+      if (defaultEl) defaultEl.textContent = controlInfo.default;
     }
     
-    if (controls.contrast) {
-      document.getElementById('contrastSlider').min = controls.contrast.min;
-      document.getElementById('contrastSlider').max = controls.contrast.max;
-      document.getElementById('contrastSlider').value = controls.contrast.value;
-      document.getElementById('contrastValue').textContent = controls.contrast.value;
+    // Update all sliders with actual camera ranges
+    updateSlider('brightnessSlider', 'brightnessValue', 'brightnessDefault', controls.brightness);
+    updateSlider('contrastSlider', 'contrastValue', 'contrastDefault', controls.contrast);
+    updateSlider('saturationSlider', 'saturationValue', 'saturationDefault', controls.saturation);
+    updateSlider('sharpnessSlider', 'sharpnessValue', 'sharpnessDefault', controls.sharpness);
+    updateSlider('gainSlider', 'gainValue', 'gainDefault', controls.gain);
+    
+    // FIX: Initialize auto-focus button state correctly
+    const focusAutoControl = controls.focus_auto || controls.focus_automatic_continuous;
+    if (focusAutoControl && focusAutoControl.value === 1) {
+      // Auto-focus is enabled
+      document.getElementById('focusAutoBtn').classList.add('active');
+      autoFocusEnabled = true;
+      document.getElementById('manualFocusGroup').style.display = 'none';
+    } else {
+      // Manual focus mode
+      document.getElementById('focusAutoBtn').classList.remove('active');
+      autoFocusEnabled = false;
+      document.getElementById('manualFocusGroup').style.display = 'flex';
+      
+      // Set focus slider range from actual camera capabilities
+      if (controls.focus_absolute && controls.focus_absolute.supported) {
+        const focusSlider = document.getElementById('focusSlider');
+        if (focusSlider) {
+          focusSlider.min = controls.focus_absolute.min;
+          focusSlider.max = controls.focus_absolute.max;
+          focusSlider.value = controls.focus_absolute.value;
+        }
+        
+        const focusValue = document.getElementById('focusValue');
+        if (focusValue) focusValue.textContent = controls.focus_absolute.value;
+        
+        // Update focus range display if you have these elements
+        const focusMin = document.getElementById('focusMin');
+        const focusMax = document.getElementById('focusMax');
+        if (focusMin) focusMin.textContent = controls.focus_absolute.min;
+        if (focusMax) focusMax.textContent = controls.focus_absolute.max;
+      }
     }
     
-    if (controls.saturation) {
-      document.getElementById('saturationSlider').min = controls.saturation.min;
-      document.getElementById('saturationSlider').max = controls.saturation.max;
-      document.getElementById('saturationSlider').value = controls.saturation.value;
-      document.getElementById('saturationValue').textContent = controls.saturation.value;
+    // Initialize backlight compensation button
+    if (controls.backlight_compensation && controls.backlight_compensation.value === 1) {
+      document.getElementById('backlightBtn').classList.add('active');
+      backlightEnabled = true;
     }
     
-    if (controls.sharpness) {
-      document.getElementById('sharpnessSlider').min = controls.sharpness.min;
-      document.getElementById('sharpnessSlider').max = controls.sharpness.max;
-      document.getElementById('sharpnessSlider').value = controls.sharpness.value;
-      document.getElementById('sharpnessValue').textContent = controls.sharpness.value;
-    }
-    
-    if (controls.gain) {
-      document.getElementById('gainSlider').min = controls.gain.min;
-      document.getElementById('gainSlider').max = controls.gain.max;
-      document.getElementById('gainSlider').value = controls.gain.value;
-      document.getElementById('gainValue').textContent = controls.gain.value;
-    }
-    
-    if (controls.focus_absolute) {
-      document.getElementById('focusSlider').min = controls.focus_absolute.min;
-      document.getElementById('focusSlider').max = controls.focus_absolute.max;
-      document.getElementById('focusSlider').value = controls.focus_absolute.value;
-      document.getElementById('focusValue').textContent = controls.focus_absolute.value;
-    }
-    
-    showToast('Camera values loaded', 'success');
   } catch (err) {
+    console.error('Failed to load camera controls:', err);
     showToast('Failed to load camera controls', 'error');
   }
+}
+
+
+async function loadWhiteBalanceStatus() {
+  try {
+    const response = await fetch(`/get_white_balance_status/${currentCamera}`);
+    const data = await response.json();
+    
+    // Clear all WB button states
+    document.getElementById('wbAutoBtn').classList.remove('active');
+    document.getElementById('wb2800Btn').classList.remove('active');
+    document.getElementById('wb4000Btn').classList.remove('active');
+    document.getElementById('wb5500Btn').classList.remove('active');
+    document.getElementById('wb6500Btn').classList.remove('active');
+    
+    if (data.mode === 'auto') {
+      document.getElementById('wbAutoBtn').classList.add('active');
+    } else if (data.temp) {
+      // Find closest preset button
+      if (Math.abs(data.temp - 2800) < 200) {
+        document.getElementById('wb2800Btn').classList.add('active');
+      } else if (Math.abs(data.temp - 4000) < 500) {
+        document.getElementById('wb4000Btn').classList.add('active');
+      } else if (Math.abs(data.temp - 5500) < 500) {
+        document.getElementById('wb5500Btn').classList.add('active');
+      } else if (Math.abs(data.temp - 6500) < 500) {
+        document.getElementById('wb6500Btn').classList.add('active');
+      }
+    }
+  } catch (err) {}
 }
 
 async function adjustZoom(delta) {
@@ -538,12 +616,18 @@ async function setPowerLineFreq(value) {
   }
 }
 
-async function resetCameraControls() {
-  showConfirm('Reset Camera Controls', 'Reset all image quality settings to defaults?', async () => {
+async function resetCameraToDefaults() {
+  showConfirm('Reset to Factory Defaults', 'Reset all camera controls to factory defaults? This uses the camera\'s actual default values.', async () => {
     try {
-      await fetch(`/reset_camera_controls/${currentCamera}`);
-      setTimeout(loadCameraControls, 500);
-      showToast('Camera controls reset', 'success');
+      const response = await fetch(`/reset_camera_controls/${currentCamera}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setTimeout(loadCameraControls, 500);
+        showToast(data.message, 'success');
+      } else {
+        showToast('Failed to reset controls', 'error');
+      }
     } catch (err) {
       showToast('Failed to reset controls', 'error');
     }
@@ -569,6 +653,7 @@ async function toggleExposure() {
 async function setWBMode(mode) {
   try {
     await fetch(`/unlock_white_balance/${currentCamera}`);
+    loadWhiteBalanceStatus();
     showToast('White balance: Auto', 'success');
   } catch (err) {
     showToast('Failed to update white balance', 'error');
@@ -579,19 +664,10 @@ async function setWBTemp(temp) {
   try {
     await fetch(`/lock_white_balance/${currentCamera}`);
     await fetch(`/set_white_balance/${currentCamera}/${temp}`);
+    loadWhiteBalanceStatus();
     showToast(`White balance: ${temp}K`, 'success');
   } catch (err) {
     showToast('Failed to set white balance', 'error');
-  }
-}
-
-async function optimizeCamera() {
-  try {
-    await fetch(`/optimize_camera/${currentCamera}`);
-    setTimeout(loadCameraControls, 500);
-    showToast('Camera optimized', 'success');
-  } catch (err) {
-    showToast('Failed to optimize', 'error');
   }
 }
 

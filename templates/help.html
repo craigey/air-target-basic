@@ -81,6 +81,11 @@
       </div>
       <div class="endpoint">
         <span class="method method-get">GET</span>
+        <span class="url">/round_summary</span>
+        <div class="description">Get round summary with statistics</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
         <span class="url">/get_scoring_config</span>
         <div class="description">Get current scoring configuration</div>
       </div>
@@ -118,6 +123,11 @@
       </div>
       <div class="endpoint">
         <span class="method method-get">GET</span>
+        <span class="url">/video_cropped/{cam_id}</span>
+        <div class="description">Cropped video centered on target area</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
         <span class="url">/set_zoom/{cam_id}/{value}</span>
         <div class="description">Set zoom level (1.0 - 4.0)</div>
       </div>
@@ -128,8 +138,18 @@
       </div>
       <div class="endpoint">
         <span class="method method-get">GET</span>
+        <span class="url">/get_zoom/{cam_id}</span>
+        <div class="description">Get current zoom level</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
         <span class="url">/set_rotation/{cam_id}/{angle}</span>
         <div class="description">Set rotation angle (0, 90, 180, 270)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/get_rotation/{cam_id}</span>
+        <div class="description">Get current rotation angle</div>
       </div>
       <div class="endpoint">
         <span class="method method-get">GET</span>
@@ -158,8 +178,80 @@
       </div>
       <div class="endpoint">
         <span class="method method-get">GET</span>
+        <span class="url">/get_white_balance_status/{cam_id}</span>
+        <div class="description">Get current white balance mode and temperature</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
         <span class="url">/optimize_camera/{cam_id}</span>
         <div class="description">Auto-optimize camera settings</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- V4L2 Camera Controls -->
+  <div class="section">
+    <div class="section-header">🎨 V4L2 Camera Controls (Image Quality)</div>
+    <div class="endpoint-list">
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/get_camera_controls/{cam_id}</span>
+        <div class="description">Get all camera controls with min/max/default/current values</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/get_camera_defaults/{cam_id}</span>
+        <div class="description">Get factory default values for all controls</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/reset_camera_controls/{cam_id}</span>
+        <div class="description">Reset all controls to factory defaults</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_brightness/{cam_id}/{value}</span>
+        <div class="description">Set brightness (-64 to 64)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_contrast/{cam_id}/{value}</span>
+        <div class="description">Set contrast (0 to 64)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_saturation/{cam_id}/{value}</span>
+        <div class="description">Set saturation (0 to 128)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_sharpness/{cam_id}/{value}</span>
+        <div class="description">Set sharpness (0 to 255)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_gain/{cam_id}/{value}</span>
+        <div class="description">Set gain/ISO (0 to 255)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_focus/{cam_id}/{value}</span>
+        <div class="description">Set manual focus value (0 to 255)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_focus_auto/{cam_id}/{0_or_1}</span>
+        <div class="description">Enable (1) or disable (0) auto-focus</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_backlight_compensation/{cam_id}/{0_or_1}</span>
+        <div class="description">Enable (1) or disable (0) backlight compensation</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_power_line_frequency/{cam_id}/{0_1_or_2}</span>
+        <div class="description">Set power line frequency (0=Disabled, 1=50Hz, 2=60Hz)</div>
       </div>
     </div>
   </div>
@@ -172,6 +264,23 @@
         <span class="method method-post">POST</span>
         <span class="url">/set_calibration</span>
         <div class="description">Save calibration points (camera_id, center, bull, outer)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lane Names -->
+  <div class="section">
+    <div class="section-header">🏷️ Lane Names API</div>
+    <div class="endpoint-list">
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/get_lane_names</span>
+        <div class="description">Get custom lane names for all cameras</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-post">POST</span>
+        <span class="url">/set_lane_name</span>
+        <div class="description">Set custom lane name for a camera</div>
       </div>
     </div>
   </div>
@@ -200,6 +309,60 @@
         <span class="url">/set_advanced_config</span>
         <div class="description">Update advanced detection settings</div>
       </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/set_detection_fps/{fps}</span>
+        <div class="description">Set detection framerate (1-30 FPS)</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/get_detection_fps</span>
+        <div class="description">Get current detection framerate</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Heatmap API -->
+  <div class="section">
+    <div class="section-header">🔥 Heatmap API</div>
+    <div class="endpoint-list">
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/toggle_heatmap</span>
+        <div class="description">Toggle heatmap visualization on/off</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/reset_heatmap</span>
+        <div class="description">Clear heatmap data</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/heatmap_status</span>
+        <div class="description">Get heatmap enabled status and data availability</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shot Recording -->
+  <div class="section">
+    <div class="section-header">📸 Shot Recording API</div>
+    <div class="endpoint-list">
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/recording_stats</span>
+        <div class="description">Get recording statistics</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/list_rounds</span>
+        <div class="description">List all recorded rounds</div>
+      </div>
+      <div class="endpoint">
+        <span class="method method-get">GET</span>
+        <span class="url">/get_shot_image/{shot_num}</span>
+        <div class="description">Get image for specific shot number</div>
+      </div>
     </div>
   </div>
 
@@ -223,6 +386,7 @@
       <code>H</code><span>Toggle heatmap</span>
       <code>R</code><span>Reset scores</span>
       <code>Space</code><span>Start/stop detection</span>
+      <code>1-4</code><span>Switch camera layout</span>
     </div>
   </div>
 
