@@ -28,13 +28,16 @@
     .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
     .btn-small { padding: 8px 16px; font-size: 13px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: 700; transition: all 0.2s; }
     .btn-small:hover { background: #333; }
-    .btn-small.active { background: #4CAF50; border-color: #4CAF50; }
+    .btn-small.active { background: #4CAF50; border-color: #4CAF50; color: #fff; box-shadow: 0 0 10px rgba(76, 175, 80, 0.5); }
+    .btn-small.inactive { background: #f44336; border-color: #f44336; color: #fff; box-shadow: 0 0 10px rgba(244, 67, 54, 0.5); }
     .btn-small.locked { background: #f44336; border-color: #f44336; }
     .btn-primary { background: #4CAF50; border-color: #4CAF50; }
     .btn-primary:hover { background: #45a049; }
     
     .slider { width: 100%; max-width: 400px; }
-    .value-display { font-size: 16px; color: #c5a000; font-weight: 700; margin: 5px 0; }
+    .slider-group { display: flex; align-items: center; gap: 15px; }
+    .value-display { font-size: 16px; color: #c5a000; font-weight: 700; min-width: 80px; text-align: center; }
+    .value-display small { font-size: 11px; color: #888; display: block; }
     
     .calibration-viewport { position: relative; cursor: crosshair; }
     .calibration-viewport.disabled { cursor: not-allowed; pointer-events: none; opacity: 0.6; }
@@ -65,21 +68,18 @@
   <div class="section">
     <div class="section-header">📹 Select Camera</div>
     <div class="form-group">
-      <label class="form-label">Camera</label>
-      <select id="cameraSelect" onchange="changeCamera()"></select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Lane Name</label>
-      <input type="text" id="laneName" placeholder="Lane 1" style="width: 200px;">
-      <button class="btn-small btn-primary" onclick="saveLaneName()" style="margin-left: 10px;">Save</button>
-      <div class="form-help">Customize the display name for this lane</div>
+      <label class="form-label">Camera Selection</label>
+      <select id="cameraSelect" class="slider" onchange="changeCamera()">
+        <!-- Populated dynamically -->
+      </select>
+      <div class="form-help">Select which camera to configure</div>
     </div>
   </div>
 
   <div class="section">
     <div class="section-header">📺 Live Preview</div>
     <div class="preview-container">
-      <img id="previewVideo" class="preview-video" src="/raw_video/1">
+      <img id="previewVideo" class="preview-video" src="/raw_video/0">
       <div class="preview-overlay">
         <span id="previewCamLabel">Camera 1</span> - <span id="previewLaneLabel">Lane 1</span> | 
         Zoom: <span id="previewZoom">1.0x</span> | 
@@ -123,15 +123,105 @@
   </div>
 
   <div class="section">
+    <div class="section-header">🎨 Image Quality (Logitech 925e)</div>
+    
+    <div class="form-group">
+      <label class="form-label">Brightness</label>
+      <div class="slider-group">
+        <input type="range" id="brightnessSlider" class="slider" min="-64" max="64" value="0" oninput="setBrightness(this.value)">
+        <div class="value-display">
+          <span id="brightnessValue">0</span>
+          <small>Default: <span id="brightnessDefault">0</span></small>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Contrast</label>
+      <div class="slider-group">
+        <input type="range" id="contrastSlider" class="slider" min="0" max="64" value="32" oninput="setContrast(this.value)">
+        <div class="value-display">
+          <span id="contrastValue">32</span>
+          <small>Default: <span id="contrastDefault">32</span></small>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Saturation</label>
+      <div class="slider-group">
+        <input type="range" id="saturationSlider" class="slider" min="0" max="128" value="64" oninput="setSaturation(this.value)">
+        <div class="value-display">
+          <span id="saturationValue">64</span>
+          <small>Default: <span id="saturationDefault">64</span></small>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Sharpness</label>
+      <div class="slider-group">
+        <input type="range" id="sharpnessSlider" class="slider" min="0" max="255" value="128" oninput="setSharpness(this.value)">
+        <div class="value-display">
+          <span id="sharpnessValue">128</span>
+          <small>Default: <span id="sharpnessDefault">128</span></small>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Gain (ISO Sensitivity)</label>
+      <div class="slider-group">
+        <input type="range" id="gainSlider" class="slider" min="0" max="255" value="0" oninput="setGain(this.value)">
+        <div class="value-display">
+          <span id="gainValue">0</span>
+          <small>Default: <span id="gainDefault">0</span></small>
+        </div>
+      </div>
+      <div class="form-help">Higher = brighter in low light but more noise</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Focus</label>
+      <div class="btn-group">
+        <button class="btn-small" id="focusAutoBtn" onclick="toggleAutoFocus()">Auto Focus</button>
+      </div>
+      <div class="slider-group" id="manualFocusGroup" style="display: none; margin-top: 10px;">
+        <input type="range" id="focusSlider" class="slider" min="0" max="255" value="0" oninput="setFocus(this.value)">
+        <div class="value-display">
+          <span id="focusValue">0</span>
+          <small>Default: <span id="focusDefault">0</span></small>
+        </div>
+      </div>
+      <div class="form-help">Logitech 925e uses "focus_automatic_continuous"</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Additional Settings</label>
+      <div class="btn-group">
+        <button class="btn-small" id="backlightBtn" onclick="toggleBacklight()">Backlight Comp</button>
+      </div>
+      <div style="margin-top: 10px;">
+        <label style="font-size: 12px; color: #888;">Power Line Frequency:</label>
+        <select id="powerLineFreq" onchange="setPowerLineFreq(this.value)" style="margin-left: 10px;">
+          <option value="0">Disabled</option>
+          <option value="1">50 Hz (Europe/Asia)</option>
+          <option value="2">60 Hz (USA/Canada)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
     <div class="section-header">⚙️ White Balance & Exposure</div>
     <div class="form-group">
       <label class="form-label">White Balance</label>
       <div class="btn-group">
         <button class="btn-small" id="wbAutoBtn" onclick="setWBMode('auto')">Auto</button>
-        <button class="btn-small" onclick="setWBTemp(2800)">Tungsten 2800K</button>
-        <button class="btn-small" onclick="setWBTemp(4000)">Fluorescent 4000K</button>
-        <button class="btn-small" onclick="setWBTemp(5500)">Daylight 5500K</button>
-        <button class="btn-small" onclick="setWBTemp(6500)">Cloudy 6500K</button>
+        <button class="btn-small" id="wb2800Btn" onclick="setWBTemp(2800)">Tungsten 2800K</button>
+        <button class="btn-small" id="wb4000Btn" onclick="setWBTemp(4000)">Fluorescent 4000K</button>
+        <button class="btn-small" id="wb5500Btn" onclick="setWBTemp(5500)">Daylight 5500K</button>
+        <button class="btn-small" id="wb6500Btn" onclick="setWBTemp(6500)">Cloudy 6500K</button>
       </div>
     </div>
     <div class="form-group">
@@ -143,9 +233,15 @@
   <div class="section">
     <div class="section-header">⚡ Quick Actions</div>
     <div class="btn-group">
-      <button class="btn-small btn-primary" onclick="optimizeCamera()">⚙️ Optimize Camera</button>
+      <button class="btn-small btn-primary" onclick="loadCameraControls()">🔄 Refresh Current Values</button>
+      <button class="btn-small btn-primary" onclick="restoreStartupSettings()">✨ Restore Startup Settings</button>
+      <button class="btn-small" onclick="resetCameraToDefaults()">↺ Reset to Defaults</button>
       <button class="btn-small btn-primary" onclick="lockAllSettings()">🔒 Lock All Settings</button>
-      <button class="btn-small" onclick="resetAllSettings()">🔄 Reset All</button>
+    </div>
+    <div class="form-help">
+      <strong>Restore Startup Settings:</strong> Optimizes camera settings (brightness to middle, contrast to 75% of max, gain to 0, auto-focus ON).<br>
+      <strong>Reset to Defaults:</strong> Same as Restore Startup Settings.<br>
+      <strong>Lock All:</strong> Locks exposure and white balance to prevent auto-adjustments.
     </div>
   </div>
 
@@ -160,7 +256,7 @@
     </div>
     
     <div class="calibration-viewport" id="calViewport">
-      <img class="preview-video" src="/raw_video/1" id="calImage" onclick="handleCalibrationClick(event)">
+      <img class="preview-video" src="/raw_video/0" id="calImage" onclick="handleCalibrationClick(event)">
     </div>
     
     <div class="btn-group" style="margin-top: 15px;">
@@ -173,11 +269,14 @@
 
 <script src="/static/modal-theme.js"></script>
 <script>
-let currentCamera = 1;  // Start from 1 instead of 0
+let currentCamera = 0;
 let calibrationPoints = [];
 let allCameras = [];
 let calibrationComplete = false;
 let laneNames = {};
+let autoFocusEnabled = true;
+let backlightEnabled = false;
+let cameraDefaults = {};
 
 window.onload = function() {
   initCameras();
@@ -188,14 +287,29 @@ window.onload = function() {
 async function initCameras() {
   try {
     const response = await fetch('/camera_urls');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
     const data = await response.json();
-    allCameras = data.cameras;
+    allCameras = data.cameras || [];
     
     const select = document.getElementById('cameraSelect');
+    if (!select) {
+      console.warn('Camera select element not found');
+      return;
+    }
+    
     select.innerHTML = '';
+    
+    if (allCameras.length === 0) {
+      // No cameras configured, use default
+      allCameras = [{camera_id: 0, lane: 'Lane 1'}];
+    }
+    
     allCameras.forEach(cam => {
       const option = document.createElement('option');
-      const camNum = cam.camera_id + 1;  // Display as 1-based
+      const camNum = cam.camera_id + 1;
       option.value = cam.camera_id;
       option.textContent = `Camera ${camNum}`;
       select.appendChild(option);
@@ -206,7 +320,16 @@ async function initCameras() {
       changeCamera();
     }
   } catch (err) {
-    showToast('Failed to load cameras', 'error');
+    console.error('Failed to load cameras:', err);
+    // Don't show toast - it's annoying and cameras still work
+    // Use fallback to camera 0
+    allCameras = [{camera_id: 0, lane: 'Lane 1'}];
+    currentCamera = 0;
+    
+    const select = document.getElementById('cameraSelect');
+    if (select) {
+      select.innerHTML = '<option value="0">Camera 1</option>';
+    }
   }
 }
 
@@ -215,9 +338,7 @@ async function loadLaneNames() {
     const response = await fetch('/get_lane_names');
     const data = await response.json();
     laneNames = data || {};
-  } catch (err) {
-    console.log('No saved lane names');
-  }
+  } catch (err) {}
 }
 
 async function saveLaneName() {
@@ -226,7 +347,6 @@ async function saveLaneName() {
     showToast('Please enter a lane name', 'warning');
     return;
   }
-  
   try {
     await fetch('/set_lane_name', {
       method: 'POST',
@@ -254,6 +374,8 @@ function changeCamera() {
   document.getElementById('previewLaneLabel').textContent = laneName;
   
   loadCameraSettings();
+  loadCameraControls();
+  loadWhiteBalanceStatus();
   calibrationPoints = [];
   calibrationComplete = false;
   document.querySelectorAll('.calibration-point').forEach(p => p.remove());
@@ -278,25 +400,140 @@ async function loadCameraSettings() {
     const rotation = data.rotation || 0;
     document.getElementById('rotationValue').textContent = rotation + '°';
     document.getElementById('rotationSlider').value = rotation;
+  } catch (err) {}
+}
+
+async function loadCameraControls() {
+  try {
+    const response = await fetch(`/get_camera_controls/${currentCamera}`);
+    const controls = await response.json();
+    
+    // Helper function to safely update sliders
+    function updateSlider(sliderId, valueId, defaultId, controlInfo) {
+      if (!controlInfo || !controlInfo.supported) {
+        console.warn(`Control not supported: ${sliderId}`);
+        return;
+      }
+      
+      const slider = document.getElementById(sliderId);
+      if (slider) {
+        slider.min = controlInfo.min;
+        slider.max = controlInfo.max;
+        slider.value = controlInfo.value;
+      }
+      
+      const valueEl = document.getElementById(valueId);
+      if (valueEl) valueEl.textContent = controlInfo.value;
+      
+      const defaultEl = document.getElementById(defaultId);
+      if (defaultEl) defaultEl.textContent = controlInfo.default;
+    }
+    
+    // Update all sliders with actual camera ranges
+    updateSlider('brightnessSlider', 'brightnessValue', 'brightnessDefault', controls.brightness);
+    updateSlider('contrastSlider', 'contrastValue', 'contrastDefault', controls.contrast);
+    updateSlider('saturationSlider', 'saturationValue', 'saturationDefault', controls.saturation);
+    updateSlider('sharpnessSlider', 'sharpnessValue', 'sharpnessDefault', controls.sharpness);
+    updateSlider('gainSlider', 'gainValue', 'gainDefault', controls.gain);
+    
+    // Initialize auto-focus button state from camera using detected control name
+    const focusControlName = controls._focus_control_name;
+    let focusAutoEnabled = false;
+    
+    if (focusControlName && controls[focusControlName]) {
+      focusAutoEnabled = controls[focusControlName].value === 1;
+    }
+    
+    const focusBtn = document.getElementById('focusAutoBtn');
+    if (focusBtn) {
+      if (focusAutoEnabled) {
+        // Auto-focus is ON - button should be GREEN
+        focusBtn.classList.add('active');
+        focusBtn.classList.remove('inactive');
+        autoFocusEnabled = true;
+        document.getElementById('manualFocusGroup').style.display = 'none';
+      } else {
+        // Auto-focus is OFF - button should be RED
+        focusBtn.classList.remove('active');
+        focusBtn.classList.add('inactive');
+        autoFocusEnabled = false;
+        document.getElementById('manualFocusGroup').style.display = 'flex';
+        
+        // Set focus slider range from actual camera capabilities
+        if (controls.focus_absolute) {
+          const focusSlider = document.getElementById('focusSlider');
+          if (focusSlider) {
+            focusSlider.min = controls.focus_absolute.min;
+            focusSlider.max = controls.focus_absolute.max;
+            focusSlider.value = controls.focus_absolute.value;
+          }
+          
+          const focusValue = document.getElementById('focusValue');
+          if (focusValue) focusValue.textContent = controls.focus_absolute.value;
+          
+          // Update focus range display
+          const focusMin = document.getElementById('focusMin');
+          const focusMax = document.getElementById('focusMax');
+          const focusDefault = document.getElementById('focusDefault');
+          if (focusMin) focusMin.textContent = controls.focus_absolute.min;
+          if (focusMax) focusMax.textContent = controls.focus_absolute.max;
+          if (focusDefault) focusDefault.textContent = controls.focus_absolute.default;
+        }
+      }
+    }
+    
+    // Initialize backlight compensation button
+    if (controls.backlight_compensation && controls.backlight_compensation.value === 1) {
+      document.getElementById('backlightBtn').classList.add('active');
+      backlightEnabled = true;
+    }
+    
   } catch (err) {
-    console.error('Failed to load camera settings');
+    console.error('Failed to load camera controls:', err);
+    showToast('Failed to load camera controls', 'error');
   }
+}
+
+
+async function loadWhiteBalanceStatus() {
+  try {
+    const response = await fetch(`/get_white_balance_status/${currentCamera}`);
+    const data = await response.json();
+    
+    // Clear all WB button states
+    document.getElementById('wbAutoBtn').classList.remove('active');
+    document.getElementById('wb2800Btn').classList.remove('active');
+    document.getElementById('wb4000Btn').classList.remove('active');
+    document.getElementById('wb5500Btn').classList.remove('active');
+    document.getElementById('wb6500Btn').classList.remove('active');
+    
+    if (data.mode === 'auto') {
+      document.getElementById('wbAutoBtn').classList.add('active');
+    } else if (data.temp) {
+      // Find closest preset button
+      if (Math.abs(data.temp - 2800) < 200) {
+        document.getElementById('wb2800Btn').classList.add('active');
+      } else if (Math.abs(data.temp - 4000) < 500) {
+        document.getElementById('wb4000Btn').classList.add('active');
+      } else if (Math.abs(data.temp - 5500) < 500) {
+        document.getElementById('wb5500Btn').classList.add('active');
+      } else if (Math.abs(data.temp - 6500) < 500) {
+        document.getElementById('wb6500Btn').classList.add('active');
+      }
+    }
+  } catch (err) {}
 }
 
 async function adjustZoom(delta) {
   try {
     const response = await fetch(`/adjust_zoom/${currentCamera}/${delta}`);
     const data = await response.json();
-    if (data.error) {
-      showToast('Zoom adjustment failed', 'error');
-    } else {
+    if (!data.error) {
       document.getElementById('zoomValue').textContent = data.zoom.toFixed(1) + 'x';
       document.getElementById('zoomSlider').value = data.zoom;
       showToast('Zoom adjusted', 'success');
     }
-  } catch (err) {
-    showToast('Zoom adjustment failed', 'error');
-  }
+  } catch (err) {}
 }
 
 async function setZoom(value) {
@@ -316,10 +553,154 @@ async function setRotation(angle) {
     const data = await response.json();
     document.getElementById('rotationValue').textContent = data.rotation + '°';
     document.getElementById('rotationSlider').value = data.rotation;
-    showToast('Rotation set', 'success');
+  } catch (err) {}
+}
+
+async function setBrightness(value) {
+  document.getElementById('brightnessValue').textContent = value;
+  try {
+    await fetch(`/set_brightness/${currentCamera}/${value}`);
+  } catch (err) {}
+}
+
+async function setContrast(value) {
+  document.getElementById('contrastValue').textContent = value;
+  try {
+    await fetch(`/set_contrast/${currentCamera}/${value}`);
+  } catch (err) {}
+}
+
+async function setSaturation(value) {
+  document.getElementById('saturationValue').textContent = value;
+  try {
+    await fetch(`/set_saturation/${currentCamera}/${value}`);
+  } catch (err) {}
+}
+
+async function setSharpness(value) {
+  document.getElementById('sharpnessValue').textContent = value;
+  try {
+    await fetch(`/set_sharpness/${currentCamera}/${value}`);
+  } catch (err) {}
+}
+
+async function setGain(value) {
+  document.getElementById('gainValue').textContent = value;
+  try {
+    await fetch(`/set_gain/${currentCamera}/${value}`);
+  } catch (err) {}
+}
+
+async function toggleAutoFocus() {
+  autoFocusEnabled = !autoFocusEnabled;
+  const btn = document.getElementById('focusAutoBtn');
+  const manualGroup = document.getElementById('manualFocusGroup');
+  
+  try {
+    const response = await fetch(`/set_focus_auto/${currentCamera}/${autoFocusEnabled ? 1 : 0}`);
+    const result = await response.json();
+    
+    if (result.success) {
+      if (autoFocusEnabled) {
+        // Auto-focus ON - GREEN button
+        btn.classList.add('active');
+        btn.classList.remove('inactive');
+        manualGroup.style.display = 'none';
+        showToast('Auto-focus enabled', 'success');
+      } else {
+        // Auto-focus OFF - RED button
+        btn.classList.remove('active');
+        btn.classList.add('inactive');
+        manualGroup.style.display = 'flex';
+        
+        // Reload controls to get updated focus slider range
+        loadCameraControls();
+        
+        showToast('Manual focus enabled', 'success');
+      }
+    } else {
+      // API call failed, revert state
+      autoFocusEnabled = !autoFocusEnabled;
+      showToast(result.error || 'Failed to toggle auto-focus', 'error');
+    }
   } catch (err) {
-    showToast('Rotation set failed', 'error');
+    // Network error, revert state
+    autoFocusEnabled = !autoFocusEnabled;
+    console.error('Auto-focus toggle error:', err);
+    showToast('Failed to toggle auto-focus', 'error');
   }
+}
+
+async function setFocus(value) {
+  document.getElementById('focusValue').textContent = value;
+  try {
+    await fetch(`/set_focus/${currentCamera}/${value}`);
+  } catch (err) {}
+}
+
+async function toggleBacklight() {
+  backlightEnabled = !backlightEnabled;
+  const btn = document.getElementById('backlightBtn');
+  
+  try {
+    await fetch(`/set_backlight_compensation/${currentCamera}/${backlightEnabled ? 1 : 0}`);
+    
+    if (backlightEnabled) {
+      btn.classList.add('active');
+      showToast('Backlight compensation ON', 'success');
+    } else {
+      btn.classList.remove('active');
+      showToast('Backlight compensation OFF', 'success');
+    }
+  } catch (err) {
+    showToast('Failed to toggle backlight', 'error');
+  }
+}
+
+async function setPowerLineFreq(value) {
+  try {
+    await fetch(`/set_power_line_frequency/${currentCamera}/${value}`);
+    const freqText = value == 0 ? 'Disabled' : (value == 1 ? '50 Hz' : '60 Hz');
+    showToast(`Power line frequency: ${freqText}`, 'success');
+  } catch (err) {
+    showToast('Failed to set power line frequency', 'error');
+  }
+}
+
+async function resetCameraToDefaults() {
+  showConfirm('Reset to Defaults', 'Reset all camera controls to startup-optimized values? This will restore brightness, contrast, and gain to the values used when the app starts.', async () => {
+    try {
+      const response = await fetch(`/reset_camera_controls/${currentCamera}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setTimeout(loadCameraControls, 500);
+        showToast(data.message, 'success');
+      } else {
+        showToast('Failed to reset controls', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to reset controls', 'error');
+    }
+  });
+}
+
+async function restoreStartupSettings() {
+  showConfirm('Restore Startup Settings', 'Restore camera to optimized settings?<br><br>This will:<br>• Set brightness to middle of range<br>• Set contrast to 75% of max<br>• Set gain to 0<br>• Enable auto-focus', async () => {
+    try {
+      const response = await fetch(`/optimize_camera/${currentCamera}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setTimeout(loadCameraControls, 500);
+        showToast('Camera settings optimized!', 'success');
+      } else {
+        showToast('Failed to optimize settings', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to optimize settings', 'error');
+    }
+  });
 }
 
 async function toggleExposure() {
@@ -341,6 +722,7 @@ async function toggleExposure() {
 async function setWBMode(mode) {
   try {
     await fetch(`/unlock_white_balance/${currentCamera}`);
+    loadWhiteBalanceStatus();
     showToast('White balance: Auto', 'success');
   } catch (err) {
     showToast('Failed to update white balance', 'error');
@@ -351,18 +733,10 @@ async function setWBTemp(temp) {
   try {
     await fetch(`/lock_white_balance/${currentCamera}`);
     await fetch(`/set_white_balance/${currentCamera}/${temp}`);
+    loadWhiteBalanceStatus();
     showToast(`White balance: ${temp}K`, 'success');
   } catch (err) {
     showToast('Failed to set white balance', 'error');
-  }
-}
-
-async function optimizeCamera() {
-  try {
-    await fetch(`/optimize_camera/${currentCamera}`);
-    showToast('Camera optimized', 'success');
-  } catch (err) {
-    showToast('Failed to optimize', 'error');
   }
 }
 
@@ -376,23 +750,8 @@ async function lockAllSettings() {
   }
 }
 
-async function resetAllSettings() {
-  showConfirm('Reset Settings', 'Reset all camera settings?', async () => {
-    try {
-      await fetch(`/set_rotation/${currentCamera}/0`);
-      await fetch(`/set_zoom/${currentCamera}/1.0`);
-      await fetch(`/unlock_white_balance/${currentCamera}`);
-      await fetch(`/unlock_exposure/${currentCamera}`);
-      loadCameraSettings();
-      showToast('Settings reset', 'success');
-    } catch (err) {
-      showToast('Failed to reset', 'error');
-    }
-  });
-}
-
 function handleCalibrationClick(event) {
-  if (calibrationComplete) return;  // Prevent adding more points after completion
+  if (calibrationComplete) return;
   
   const rect = event.target.getBoundingClientRect();
   const x = event.clientX - rect.left;

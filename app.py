@@ -433,11 +433,40 @@ def set_zoom_route(cam_id, zoom):
     return jsonify({"zoom": actual_zoom})
 
 
-@app.route("/adjust_zoom/<int:cam_id>/<float:delta>")
+@app.route("/adjust_zoom/<int:cam_id>/<delta>")
 def adjust_zoom_route(cam_id, delta):
-    """Adjust zoom by delta."""
-    new_zoom = adjust_zoom(cam_id, delta)
-    return jsonify({"zoom": new_zoom})
+    """Adjust zoom by delta (handles negative values like -0.5, -0.1)."""
+    try:
+        delta_float = float(delta)
+        new_zoom = adjust_zoom(cam_id, delta_float)
+        print(f"🔍 Zoom adjusted by {delta_float}: new zoom = {new_zoom}")
+        return jsonify({"zoom": new_zoom, "success": True})
+    except ValueError as e:
+        print(f"❌ Invalid delta value: {delta}")
+        return jsonify({"error": f"Invalid delta: {delta}", "success": False}), 400
+    except Exception as e:
+        print(f"❌ Adjust zoom error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e), "success": False}), 500
+
+
+@app.route("/reset_zoom/<int:cam_id>")
+def reset_zoom_route(cam_id):
+    """Reset zoom to default (1.0x)."""
+    try:
+        actual_zoom = set_zoom(cam_id, 1.0)
+        print(f"🔍 Zoom reset to 1.0x (actual: {actual_zoom})")
+        return jsonify({"zoom": actual_zoom, "success": True})
+    except Exception as e:
+        print(f"❌ Reset zoom error: {e}")
+        return jsonify({"error": str(e), "success": False}), 500
+        return jsonify({"error": f"Invalid delta: {delta}", "success": False}), 400
+    except Exception as e:
+        print(f"❌ Adjust zoom error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e), "success": False}), 500
 
 
 @app.route("/get_zoom/<int:cam_id>")
@@ -520,115 +549,128 @@ def get_white_balance_status(cam_id):
 
 @app.route("/optimize_camera/<int:cam_id>")
 def optimize_camera_route(cam_id):
-    """Optimize camera settings to safe defaults within actual ranges."""
+    """Optimize camera to actual working defaults (same as reset)."""
     try:
-        # Get actual camera ranges
-        controls = get_all_v4l2_controls(cam_id)
+        print(f"\n🔧 OPTIMIZE CAMERA {cam_id}")
         
-        # Set v4l2 controls to safe values WITHIN camera's actual ranges
-        # Brightness: 0 is middle of -64 to 64 range (safe for all cameras)
-        if 'brightness' in controls:
-            brightness_val = 0  # Middle of typical -64 to 64 range
-            brightness_val = max(controls['brightness']['min'], 
-                               min(controls['brightness']['max'], brightness_val))
-            set_v4l2_control(cam_id, "brightness", brightness_val)
-            print(f"📋 Brightness set to {brightness_val} (range: {controls['brightness']['min']}-{controls['brightness']['max']})")
-        
-        # Contrast: 75% of max (high but not maxed)
-        if 'contrast' in controls:
-            max_contrast = controls['contrast']['max']
-            contrast_val = int(max_contrast * 0.75)  # 75% of max
-            contrast_val = max(controls['contrast']['min'], 
-                             min(controls['contrast']['max'], contrast_val))
-            set_v4l2_control(cam_id, "contrast", contrast_val)
-            print(f"📋 Contrast set to {contrast_val} (75% of max {max_contrast})")
-        
-        # Gain: minimum for best quality
+        # Set to actual working values (same as reset)
+        set_v4l2_control(cam_id, "brightness", 128)
+        set_v4l2_control(cam_id, "contrast", 128)
+        set_v4l2_control(cam_id, "saturation", 128)
+        set_v4l2_control(cam_id, "sharpness", 128)
         set_v4l2_control(cam_id, "gain", 0)
+        set_v4l2_control(cam_id, "white_balance_temperature", 4000)
+        set_v4l2_control(cam_id, "power_line_frequency", 2)
+        set_v4l2_control(cam_id, "focus_automatic_continuous", 1)  # Auto-focus ON
+        set_v4l2_control(cam_id, "auto_exposure", 3)  # Aperture Priority
+        set_v4l2_control(cam_id, "exposure_dynamic_framerate", 1)
+        set_v4l2_control(cam_id, "zoom_absolute", 100)
         
-        # Enable auto-focus (not disable!)
-        focus_control_name = get_focus_control_name(cam_id)
-        if focus_control_name:
-            set_v4l2_control(cam_id, focus_control_name, 1)  # 1 = AUTO-FOCUS ON
-            print(f"✅ Auto-focus ENABLED using {focus_control_name}")
+        print("✅ Camera optimized:")
+        print("   All sliders: 128 (except gain=0)")
+        print("   Auto-focus: ON")
+        print("   Auto-exposure: Aperture Priority\n")
         
-        # Also run the OpenCV optimization
+        # Also run OpenCV optimization
         optimize_camera_settings(cam_id)
         
         return jsonify({
             "success": True,
-            "message": "Camera optimized with safe values"
+            "message": "Camera optimized (brightness/contrast/saturation/sharpness=128, gain=0, autofocus=ON)"
         })
     except Exception as e:
-        print(f"❌ Optimize camera error: {e}")
-        return jsonify({
-            "success": False,
-            "message": f"Failed to optimize: {str(e)}"
-        }), 500
+        print(f"❌ Optimize error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ========== V4L2 Camera Control Endpoints ==========
 
 @app.route("/get_camera_controls/<int:cam_id>")
 def get_camera_controls(cam_id):
-    """Get all camera controls with fixed defaults and focus control detection."""
+    """Get all camera controls with corrected defaults matching actual camera state."""
     try:
+        print(f"\n{'='*60}")
+        print(f"GET_CAMERA_CONTROLS for camera {cam_id}")
+        print(f"{'='*60}")
+        
         controls = get_all_v4l2_controls(cam_id)
         
-        # STARTUP OPTIMIZATION VALUES (what the camera is set to when app starts)
-        # These are the "good" defaults that match optimize_camera_settings()
-        startup_values = {
-            'brightness': 128,    # Middle of 0-255
-            'contrast': 150,      # High for pellet visibility
-            'saturation': 64,     # Middle
-            'sharpness': 128,     # Middle
-            'gain': 0,            # Minimum for quality
+        # ACTUAL CURRENT VALUES from user's camera (from v4l2-ctl --get-ctrl)
+        # These are the values the camera is currently using and working well
+        actual_current_values = {
+            'brightness': 128,
+            'contrast': 128,
+            'saturation': 128,
+            'sharpness': 128,
+            'gain': 0,
+            'white_balance_automatic': 1,
+            'power_line_frequency': 2,
+            'white_balance_temperature': 4000,
+            'auto_exposure': 3,  # Aperture Priority Mode
+            'exposure_time_absolute': 250,
+            'exposure_dynamic_framerate': 1,
+            'pan_absolute': 0,
+            'tilt_absolute': 0,
+            'focus_absolute': 0,
+            'focus_automatic_continuous': 1,
+            'zoom_absolute': 100
         }
         
-        # Fix invalid defaults (like -8193, 57343 which are V4L2 driver bugs)
+        # Fix garbage defaults (firmware bugs: -8193, 57343, 8189)
         for control_name, control_info in controls.items():
             default = control_info.get('default', 0)
             min_val = control_info.get('min', 0)
             max_val = control_info.get('max', 255)
             
-            # Detect invalid defaults (outside valid range)
-            if default < min_val or default > max_val:
-                # Use startup optimization values if available, otherwise calculate middle
-                if control_name in startup_values:
-                    control_info['default'] = startup_values[control_name]
-                    print(f"⚠️  Using startup value for {control_name}: {startup_values[control_name]} (factory default {default} was invalid)")
-                elif control_name in ['brightness', 'hue']:
-                    control_info['default'] = 0  # Centered
-                elif control_name == 'contrast':
-                    control_info['default'] = 32  # Typical middle value
-                elif control_name == 'saturation':
-                    control_info['default'] = 64  # Typical middle value
-                elif control_name == 'sharpness':
-                    control_info['default'] = 128  # Middle of 0-255
-                elif control_name == 'gain':
-                    control_info['default'] = 0  # Minimum for best quality
-                elif control_name in ['white_balance_temperature']:
-                    control_info['default'] = 4000  # Typical daylight
+            # Check if default is garbage (outside valid range)
+            is_garbage = (default < min_val or default > max_val)
+            
+            if is_garbage:
+                # Use actual current value if we have one, otherwise middle of range
+                if control_name in actual_current_values:
+                    fixed_default = actual_current_values[control_name]
+                    print(f"  🔧 {control_name}: garbage {default} → {fixed_default} (current value)")
                 else:
-                    # For unknown controls, use middle of range
-                    control_info['default'] = (max_val - min_val) // 2 + min_val
+                    fixed_default = (max_val - min_val) // 2 + min_val
+                    print(f"  🔧 {control_name}: garbage {default} → {fixed_default} (middle)")
                 
-                print(f"⚠️  Fixed invalid default for {control_name}: {default} → {control_info['default']}")
-            elif control_name in startup_values:
-                # Even if factory default is valid, show our optimized startup value as the "recommended" default
-                control_info['startup_optimized'] = startup_values[control_name]
+                control_info['default'] = fixed_default
+                control_info['_was_garbage'] = True
+                control_info['_original_default'] = default
+            
+            # Special range fixes
+            if control_name == 'zoom_absolute':
+                # User reported actual range is 100-215, not 100-500
+                if control_info.get('max') == 500:
+                    print(f"  📏 zoom_absolute: fixing max from 500 to 215 (actual camera range)")
+                    control_info['max'] = 215
         
-        # Add focus control detection info
+        # Add focus control detection
         focus_control_name = get_focus_control_name(cam_id)
         controls["_focus_control_name"] = focus_control_name
         
-        # Add focus controls availability
         focus_info = check_focus_controls(cam_id)
         controls["_focus_controls"] = focus_info
+        
+        # Log what we're returning
+        if 'brightness' in controls:
+            print(f"  → brightness.default = {controls['brightness'].get('default')}")
+        if 'contrast' in controls:
+            print(f"  → contrast.default = {controls['contrast'].get('default')}")
+        if 'saturation' in controls:
+            print(f"  → saturation.default = {controls['saturation'].get('default')}")
+        if 'focus_automatic_continuous' in controls:
+            print(f"  → focus_automatic_continuous.value = {controls['focus_automatic_continuous'].get('value')}")
+        
+        print(f"{'='*60}\n")
         
         return jsonify(controls)
     except Exception as e:
         print(f"❌ Get controls error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
@@ -695,6 +737,18 @@ def set_power_line_frequency(cam_id, value):
     return jsonify({"success": success, "value": value})
 
 
+@app.route("/set_control/<int:cam_id>/<control_name>/<int:value>")
+def set_control(cam_id, control_name, value):
+    """Generic endpoint to set any camera control."""
+    try:
+        success = set_v4l2_control(cam_id, control_name, value)
+        print(f"📋 Set {control_name} = {value}: {'success' if success else 'failed'}")
+        return jsonify({"success": success, "value": value, "control": control_name})
+    except Exception as e:
+        print(f"❌ Error setting {control_name}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/set_exposure_auto/<int:cam_id>/<int:value>")
 def set_exposure_auto(cam_id, value):
     """Set exposure auto mode (1=Manual, 3=Auto)."""
@@ -755,71 +809,75 @@ def set_focus(cam_id, value):
 
 @app.route("/reset_camera_controls/<int:cam_id>")
 def reset_camera_controls(cam_id):
-    """Reset camera controls to safe defaults within actual camera ranges."""
+    """Reset camera controls to actual working defaults (user's current camera values)."""
     try:
+        print(f"\n{'='*60}")
+        print(f"RESET CAMERA CONTROLS for camera {cam_id}")
+        print(f"{'='*60}")
+        
         controls = get_all_v4l2_controls(cam_id)
         
-        # IMPORTANT: Use values that are WITHIN the actual camera's ranges!
-        # Logitech 925e has: brightness (-64 to 64), contrast (0 to 64)
-        # These values are calculated to work across different camera models
-        startup_optimized_defaults = {
-            'brightness': 0,           # Middle of typical -64 to 64 range (safer than 128!)
-            'contrast': 48,            # High but within 0-64 range (not 150!)
-            'saturation': 64,          # Middle of 0-128 range
-            'sharpness': 128,          # Middle of 0-255 range
-            'gain': 0,                 # Minimum gain for best quality
-            'exposure_absolute': 166,  # Common default
-            'white_balance_temperature': 4000,  # Daylight
-            'power_line_frequency': 2, # 60Hz (use 1 for 50Hz)
-            'backlight_compensation': 0,  # Off
-            'hue': 0                   # Centered
+        # ACTUAL WORKING DEFAULTS from user's camera (from v4l2-ctl --get-ctrl)
+        # These are the values currently set and working well
+        reset_to_values = {
+            'brightness': 128,
+            'contrast': 128,
+            'saturation': 128,
+            'sharpness': 128,
+            'gain': 0,
+            'white_balance_automatic': 1,
+            'power_line_frequency': 2,
+            'white_balance_temperature': 4000,
+            'auto_exposure': 3,  # Aperture Priority Mode
+            'exposure_time_absolute': 250,
+            'exposure_dynamic_framerate': 1,
+            'pan_absolute': 0,
+            'tilt_absolute': 0,
+            'focus_absolute': 0,
+            'focus_automatic_continuous': 1,  # Auto-focus ON
+            'zoom_absolute': 100,
+            'backlight_compensation': 0
         }
         
-        # For focus controls, ENABLE auto-focus (not disable!)
-        focus_control_name = get_focus_control_name(cam_id)
-        if focus_control_name:
-            startup_optimized_defaults[focus_control_name] = 1  # Auto-focus ON
+        print("Resetting to actual working values:")
         
         reset_count = 0
         for control_name, control_info in controls.items():
-            default = control_info.get("default", 0)
             min_val = control_info.get("min", 0)
             max_val = control_info.get("max", 255)
             
-            # Decide which default to use
-            if control_name in startup_optimized_defaults:
-                # Use our safe default, but clamp to actual range
-                target_value = startup_optimized_defaults[control_name]
-                target_value = max(min_val, min(max_val, target_value))
-                print(f"📋 Using safe value for {control_name}: {target_value} (range: {min_val}-{max_val})")
-            elif default < min_val or default > max_val:
-                # Factory default is invalid, calculate middle of range
-                target_value = (max_val - min_val) // 2 + min_val
-                print(f"⚠️  Invalid factory default for {control_name}, using middle: {target_value}")
-            else:
-                # Factory default is valid, use it
-                target_value = default
-            
-            # Double-check clamping
-            target_value = max(min_val, min(max_val, target_value))
-            
-            # Set the control
-            if set_v4l2_control(cam_id, control_name, target_value):
-                reset_count += 1
+            # Use reset value if we have one, otherwise skip
+            if control_name in reset_to_values:
+                target = reset_to_values[control_name]
+                
+                # Clamp to valid range
+                target = max(min_val, min(max_val, target))
+                
+                print(f"  {control_name}: → {target}")
+                
+                if set_v4l2_control(cam_id, control_name, target):
+                    reset_count += 1
         
-        print(f"✅ Reset {reset_count} controls to safe defaults")
+        print(f"\n✅ RESET COMPLETE: {reset_count} controls")
+        print(f"   brightness: 128")
+        print(f"   contrast: 128")
+        print(f"   saturation: 128")
+        print(f"   sharpness: 128")
+        print(f"   gain: 0")
+        print(f"   focus_automatic_continuous: 1 (ON)")
+        print(f"   auto_exposure: 3 (Aperture Priority)")
+        print(f"{'='*60}\n")
         
         return jsonify({
             "success": True,
-            "message": f"Reset {reset_count} controls to safe defaults",
+            "message": f"Reset {reset_count} controls to working defaults (all 128 except gain=0)",
             "count": reset_count
         })
     except Exception as e:
-        print(f"❌ Reset controls error: {e}")
-        return jsonify({
-            "success": False,
-            "message": f"Failed to reset: {str(e)}"
-        }), 500
+        print(f"❌ Reset error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ========== Lane Name Management ==========
